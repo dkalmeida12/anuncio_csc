@@ -3,7 +3,7 @@ from datetime import datetime
 import re
 import unicodedata
 from difflib import SequenceMatcher
-import streamlit as st # Import streamlit
+import streamlit as st
 
 # EFETIVO CSC-PM (INTEGRADO NO CÓDIGO)
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
@@ -41,46 +41,35 @@ S MANUTENÇÃO,097.538-3,3ºSGT,QPR,CARLOS R SANTIAGO DOS SANTOS
 S MANUTENÇÃO,127.860-5,3º SGT,QPPM,WAGNER VITOR DOS SANTOS"""
 
 st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.2")
-st.markdown("---") # Separator
+st.markdown("---")
 
 # Carregar efetivo
 df_efetivo = pd.read_csv(pd.io.common.StringIO(EFETIVO_CSC))
 
 # Upload do formulário
-st.write("\n📋 FAÇA O UPLOAD DA PLANILHA DO GOOGLE FORMULÁRIOS (XLS/XLSX):")
+st.write("📋 FAÇA O UPLOAD DA PLANILHA DO GOOGLE FORMULÁRIOS (XLS/XLSX):")
 uploaded_file = st.file_uploader("Escolha um arquivo Excel", type=["xls", "xlsx"])
 
 if uploaded_file is not None:
-    st.write("\n📊 Processando dados...")
+    st.write("📊 Processando dados...")
     df_formulario = pd.read_excel(uploaded_file)
 
-    # Data atual (use a data do formulário ou a data atual se preferir, mas para consistência com o Colab original,
-    # let's assume data_atual is still datetime.now() or maybe st.date_input for more control)
-    # For now, keep it as datetime.now() for default behavior
-    data_atual = datetime.now() # or st.date_input("Data do Anúncio", datetime.now()) if the user wants to specify the date
+    data_atual = datetime.now()
     data_formatada = data_atual.strftime("%d/%m/%Y")
 
-  
     # ----------------------------
-    # Normalizações / Matching (These functions are independent of Streamlit/Colab)
+    # Normalizações / Matching
     # ----------------------------
     def remover_acentos(s: str) -> str:
         s = unicodedata.normalize("NFKD", s)
         return "".join(ch for ch in s if not unicodedata.combining(ch))
 
     def normalizar_nome(nome):
-        """
-        Normalização robusta para comparação:
-        - upper
-        - remove acentos
-        - remove pontuação (ex.: "R." -> "R")
-        - colapsa múltiplos espaços
-        """
         if pd.isna(nome):
             return ""
         s = str(nome).strip().upper()
         s = remover_acentos(s)
-        s = re.sub(r"[^A-Z\s]", " ", s)   # remove tudo que não for letra/espaço
+        s = re.sub(r"[^A-Z\s]", " ", s)
         s = re.sub(r"\s+", " ", s).strip()
         return s
 
@@ -92,18 +81,12 @@ if uploaded_file is not None:
         return posto
 
     def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
-        """
-        Remove apenas prefixos de posto/graduação e marcadores (PM/ASPM),
-        preservando o nome completo do cabeçalho.
-        """
         s = str(nome_coluna).strip()
 
-        # Se houver " PM " (com espaços), tudo depois disso é o nome completo
         if " PM " in s.upper():
             idx = s.upper().rfind(" PM ")
             return s[idx + 4:].strip()
 
-        # Caso não tenha "PM" (ex.: ASPM), remove somente prefixos comuns (no início)
         s = re.sub(r'^[\s]*ASPM[\s]+', '', s, flags=re.IGNORECASE)
         s = re.sub(r'^[\s]*\d+[º°][\s]*', '', s, flags=re.IGNORECASE)
         s = re.sub(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', '', s, flags=re.IGNORECASE)
@@ -115,20 +98,11 @@ if uploaded_file is not None:
         return SequenceMatcher(None, a, b).ratio()
 
     def encontrar_militar(nome_extraido: str, efetivo_dict: dict, limiar: float = 0.88):
-        """
-        1) tenta match exato (normalizado)
-        2) se não achar, faz fuzzy match (para corrigir casos do tipo:
-           - "Hebert" vs "Herbert"
-           - "R." vs "R"
-        Retorna: (chave_norm_do_efetivo, dados) ou (None, None)
-        """
         nome_norm = normalizar_nome(nome_extraido)
 
-        # Exato
         if nome_norm in efetivo_dict:
             return nome_norm, efetivo_dict[nome_norm]
 
-        # Fuzzy: pega o melhor candidato
         melhor_key = None
         melhor_score = 0.0
         for key in efetivo_dict.keys():
@@ -163,7 +137,6 @@ if uploaded_file is not None:
 
         return None
 
-    # Prioridade apenas para desempate quando houver mais de um item no mesmo campo
     def prioridade_texto(resp_lower: str) -> int:
         if 'férias' in resp_lower or 'ferias' in resp_lower:
             return 1
@@ -215,10 +188,10 @@ if uploaded_file is not None:
     df_hoje = df_formulario[df_formulario['Data do anúncio'].dt.date == data_atual.date()].copy()
 
     if df_hoje.empty:
-        st.warning(f"\n⚠️ ATENÇÃO: Não há registros para a data {data_formatada}")
+        st.warning(f"⚠️ ATENÇÃO: Não há registros para a data {data_formatada}")
         st.info("Verifique se a 'Data do anúncio' no formulário corresponde à data de hoje.")
     else:
-        st.success(f"\n✅ Encontrados {len(df_hoje)} registro(s) para {data_formatada}")
+        st.success(f"✅ Encontrados {len(df_hoje)} registro(s) para {data_formatada}")
 
     df_hoje = df_hoje.sort_values('Carimbo de data/hora', ascending=False)
 
@@ -232,7 +205,6 @@ if uploaded_file is not None:
     for _, row in df_hoje.iterrows():
         secao = str(row['Seção:'])
 
-        # processa apenas a resposta mais recente por seção
         if secao in secoes_processadas:
             continue
         secoes_processadas.add(secao)
@@ -259,7 +231,6 @@ if uploaded_file is not None:
                 resp_lower = resp.lower()
                 periodo = extrair_periodo(resp)
 
-                # Preservar o TEXTO EXATO da planilha para exibição
                 if 'presente' in resp_lower:
                     candidatos.append(("Presente", 6))
                 elif 'ausente' in resp_lower:
@@ -269,9 +240,9 @@ if uploaded_file is not None:
                 elif 'dispensa' in resp_lower:
                     candidatos.append(("Dispensa pela Chefia", 5))
                 elif 'férias' in resp_lower or 'ferias' in resp_lower:
-                    candidatos.append((resp, 1))  # ex.: "Férias", "Férias 02/01 à 10/01"
+                    candidatos.append((resp, 1))
                 elif 'licença' in resp_lower or 'licenca' in resp_lower:
-                    candidatos.append((resp, 2))  # ex.: "Licença luto"
+                    candidatos.append((resp, 2))
                 else:
                     candidatos.append((resp, prioridade_texto(resp_lower)))
 
@@ -325,7 +296,7 @@ if uploaded_file is not None:
             categorias_dados[categoria]['afastamentos'].setdefault(status, []).append(posto_nome_saida)
 
     # ----------------------------
-    # Gerar anúncio
+    # Gerar anúncio (COM ESPAÇO ENTRE TÓPICOS 🔹)
     # ----------------------------
     anuncio = f"""Bom dia!
 Segue anúncio do dia
@@ -364,17 +335,21 @@ Anúncio CSC-PM
         anuncio += "Efetivo total: \n"
         anuncio += f"🔸{dados['total']} - CSC-PM\n"
 
+        # Presentes
         if dados['presentes']:
             anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
             for idx, nome in enumerate(dados['presentes'], 1):
                 anuncio += f"    {idx}. {nome}\n"
-        
+            anuncio += "\n"  # <-- ESPAÇO ENTRE TÓPICOS 🔹
+
+        # Afastamentos
         afast = dados['afastamentos']
         for status in sorted(afast.keys(), key=ordem_status):
             lista = afast[status]
             anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
                 anuncio += f"    {idx}. {info}\n"
+            anuncio += "\n"  # <-- ESPAÇO ENTRE TÓPICOS 🔹
 
         anuncio += "\n"
 
@@ -396,7 +371,6 @@ Civis: {total_civis}"""
             st.write(f"   • {militar}")
         st.warning(f"❌ Total de {len(militares_nao_informados)} militar(es) faltando no anúncio.")
 
-    # Streamlit download button
     st.download_button(
         label="Baixar Anúncio de Presença",
         data=anuncio.encode('utf-8'),
