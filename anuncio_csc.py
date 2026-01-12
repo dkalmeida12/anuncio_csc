@@ -357,9 +357,9 @@ Anúncio CSC-PM
 [PREENCHER MANUALMENTE]
 [PREENCHER HORA]
 ➖➖➖➖➖ ➖ ➖
-Efetivo presente:
-Militares: {total_militares}
-Civis: {total_civis}"""
+*Efetivo presente*:
+*Militares: {total_militares}*
+*Civis: {total_civis}*"""
 
     st.markdown("---")
     st.subheader("📢 ANÚNCIO GERADO:")
