@@ -26,11 +26,11 @@ def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
     return r.content
 
 # =========================
-# EFETIVO CSC-PM (INTEGRADO NO CÓDIGO) - VERSÃO "GITHUB"
+# EFETIVO CSC-PM (INTEGRADO NO CÓDIGO) - VERSÃO "GITHUB" (COM *)
 # =========================
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
 CHEFE,126.554-5,*TEN CEL*,QOPM,*LEONARDO* de *CASTRO* Ferreira
-SUBCHEFE,089.655-5,*MAJ*,QOR,Jorge Aparacido *GOMES*
+SUBCHEFE,089.655-5,*MAJ*,QOR,Jorge Aparecido *GOMES*
 LICITAÇÃO,161.300-9,*CAP*,QOPM,Thiago Fernandes *PALMEIRA*
 LICITAÇÃO,100.433-2,*2ºTEN*,QOR,*CLAUDIO* Marcio da Silva
 LICITAÇÃO,087.650-8,*SUBTEN*,QPR,Sérgio Bernardino de *SENA*
@@ -73,41 +73,54 @@ if "periodos_aplicados" not in st.session_state:
     st.session_state.periodos_aplicados = False
 if "periodos_inseridos" not in st.session_state:
     st.session_state.periodos_inseridos = {}
-# ✅ NOVO: memória de períodos anteriores para pré-preenchimento
 if "periodos_memoria" not in st.session_state:
     st.session_state.periodos_memoria = {}  # chave_norm -> (inicio, fim)
 
 # =========================
 # Funções auxiliares
 # =========================
-def limpar_markdown_asteriscos(s: str) -> str:
+def remover_asteriscos(s: str) -> str:
     return re.sub(r"\*", "", str(s)) if s is not None else ""
 
 def remover_acentos(s: str) -> str:
     s = unicodedata.normalize("NFKD", s)
     return "".join(ch for ch in s if not unicodedata.combining(ch))
 
-def normalizar_nome(nome):
+def normalizar_nome(nome: str) -> str:
+    """
+    Normalização para matching:
+    - remove *
+    - upper
+    - remove acentos
+    - remove pontuação
+    - colapsa espaços
+    """
     if pd.isna(nome):
         return ""
-    s = str(nome).strip().upper()
+    s = str(nome).strip()
+    s = remover_asteriscos(s)
+    s = s.upper()
     s = remover_acentos(s)
     s = re.sub(r"[^A-Z\s]", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def normalizar_posto(posto):
-    posto = str(posto).strip().upper()
-    posto = posto.replace('º', '°')
-    posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
-    posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
-    return posto
+def normalizar_posto(posto: str) -> str:
+    """
+    Normaliza posto/graduação para exibição/consistência.
+    ATENÇÃO: NÃO remove '*' aqui porque o posto precisa manter negrito no WhatsApp.
+    """
+    s = str(posto).strip()
+    s = s.replace('º', '°')
+    s = s.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
+    return s
 
 def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
     s = str(nome_coluna).strip()
     if " PM " in s.upper():
         idx = s.upper().rfind(" PM ")
         return s[idx + 4:].strip()
+
     s = re.sub(r'^[\s]*ASPM[\s]+', '', s, flags=re.IGNORECASE)
     s = re.sub(r'^[\s]*\d+[º°][\s]*', '', s, flags=re.IGNORECASE)
     s = re.sub(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', '', s, flags=re.IGNORECASE)
@@ -118,6 +131,10 @@ def similaridade(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 def encontrar_militar(nome_extraido: str, efetivo_dict: dict, limiar: float = 0.88):
+    """
+    nome_extraido vem do cabeçalho do formulário (sem * normalmente).
+    a chave do efetivo_dict é normalizada (sem *).
+    """
     nome_norm = normalizar_nome(nome_extraido)
     if nome_norm in efetivo_dict:
         return nome_norm, efetivo_dict[nome_norm]
@@ -167,17 +184,16 @@ def formatar_periodo(inicio: date, fim: date) -> str:
     return f"{inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
 
 def precisa_periodo(status: str) -> bool:
-    s = status.lower()
-    return ('férias' in s or 'ferias' in s or 'licença' in s or 'licenca' in s)
+    sl = status.lower()
+    return ('férias' in sl or 'ferias' in sl or 'licença' in sl or 'licenca' in sl)
 
-# ✅ NOVO: validação simples
 def validar_periodo(inicio: date, fim: date) -> bool:
     return fim >= inicio
 
 # =========================
 # UI
 # =========================
-st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.8")
+st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.9")
 st.markdown("---")
 
 with st.sidebar:
@@ -186,8 +202,6 @@ with st.sidebar:
         st.session_state.fonte_ok = False
         st.session_state.periodos_aplicados = False
         st.session_state.periodos_inseridos = {}
-        # mantém memória por padrão (se quiser limpar também, descomente)
-        # st.session_state.periodos_memoria = {}
         st.rerun()
 
     if st.button("Limpar memória de períodos"):
@@ -225,7 +239,6 @@ else:
         st.success("✅ Planilha carregada via upload!")
 
 df_formulario = st.session_state.df_formulario
-
 if not st.session_state.fonte_ok or df_formulario is None:
     st.info("Carregue a planilha para continuar.")
     st.stop()
@@ -236,18 +249,22 @@ if not st.session_state.fonte_ok or df_formulario is None:
 data_atual = datetime.now()
 data_formatada = data_atual.strftime("%d/%m/%Y")
 
+# ---- Efetivo: mantém display COM '*' e cria chaves de match SEM '*'
 df_efetivo = pd.read_csv(pd.io.common.StringIO(EFETIVO_CSC))
+
+# strip simples (SEM remover *)
 for col in ['SEÇÃO', 'NÚMERO', 'P  / G', 'QUADRO', 'NOME']:
     if col in df_efetivo.columns:
-        df_efetivo[col] = df_efetivo[col].apply(limpar_markdown_asteriscos).str.strip()
+        df_efetivo[col] = df_efetivo[col].astype(str).str.strip()
 
 efetivo_dict = {}
 for _, row in df_efetivo.iterrows():
-    nome_completo = str(row['NOME']).strip()
+    nome_display = str(row['NOME']).strip()                  # COM *
+    posto_display = normalizar_posto(str(row['P  / G']).strip())  # COM *
     quadro = str(row['QUADRO']).strip().upper()
-    posto_grad = normalizar_posto(str(row['P  / G']))
     secao_efetivo = str(row['SEÇÃO']).strip().upper()
 
+    # categoria
     if quadro in ['QOPM', 'QOR', 'QOC']:
         categoria = 'OFICIAIS'
     elif quadro in ['QPR', 'QPPM', 'QPE']:
@@ -257,22 +274,28 @@ for _, row in df_efetivo.iterrows():
     else:
         categoria = None
 
-    if categoria:
-        nome_norm = normalizar_nome(nome_completo)
-        efetivo_dict[nome_norm] = {
-            'categoria': categoria,
-            'posto_grad': posto_grad,
-            'nome_completo': nome_completo,
-            'quadro': quadro,
-            'secao': secao_efetivo
-        }
+    if not categoria:
+        continue
 
+    # chave de matching SEM *
+    nome_norm = normalizar_nome(nome_display)
+
+    efetivo_dict[nome_norm] = {
+        'categoria': categoria,
+        'posto_display': posto_display,   # COM *
+        'nome_display': nome_display,     # COM *
+        'quadro': quadro,
+        'secao': secao_efetivo
+    }
+
+# ---- Validar colunas
 colunas_obrigatorias = {'Carimbo de data/hora', 'Data do anúncio', 'Seção:'}
 faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
 if faltando:
     st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
     st.stop()
 
+# ---- Filtrar dia atual
 df_formulario['Carimbo de data/hora'] = pd.to_datetime(df_formulario['Carimbo de data/hora'])
 df_formulario['Data do anúncio'] = pd.to_datetime(df_formulario['Data do anúncio'])
 df_hoje = df_formulario[df_formulario['Data do anúncio'].dt.date == data_atual.date()].copy()
@@ -289,6 +312,7 @@ else:
 
 df_hoje = df_hoje.sort_values('Carimbo de data/hora', ascending=False)
 
+# ---- Coletar respostas (mais recente por seção)
 respostas_dict = {}
 secoes_processadas = set()
 colunas_militares = df_formulario.columns[4:]
@@ -313,33 +337,35 @@ for _, row in df_hoje.iterrows():
         candidatos = []
 
         for resp in respostas:
-            resp_lower = resp.lower()
-            if 'presente' in resp_lower:
+            rl = resp.lower()
+            if 'presente' in rl:
                 candidatos.append(("Presente", 6))
-            elif 'ausente' in resp_lower:
+            elif 'ausente' in rl:
                 candidatos.append(("Ausente", 3))
-            elif 'folga' in resp_lower:
+            elif 'folga' in rl:
                 candidatos.append(("Folga", 4))
-            elif 'dispensa' in resp_lower:
+            elif 'dispensa' in rl:
                 candidatos.append(("Dispensa pela Chefia", 5))
-            elif 'férias' in resp_lower or 'ferias' in resp_lower:
-                candidatos.append((resp, 1))
-            elif 'licença' in resp_lower or 'licenca' in resp_lower:
-                candidatos.append((resp, 2))
+            elif 'férias' in rl or 'ferias' in rl:
+                candidatos.append((resp, 1))      # mantém texto exato do formulário
+            elif 'licença' in rl or 'licenca' in rl:
+                candidatos.append((resp, 2))      # mantém texto exato do formulário (ex.: Licença luto)
             else:
-                candidatos.append((resp, prioridade_texto(resp_lower)))
+                candidatos.append((resp, prioridade_texto(rl)))
 
         if not candidatos:
             continue
 
         candidatos.sort(key=lambda x: x[1])
         status_texto_exato = candidatos[0][0]
-        respostas_dict[chave_efetivo] = {'status': status_texto_exato, 'dados': militar_encontrado}
+
+        respostas_dict[chave_efetivo] = {
+            'status': status_texto_exato,
+            'dados': militar_encontrado
+        }
 
 # =========================
-# 3) Períodos (Férias / Licença) com:
-#    (A) Validação fim >= início
-#    (B) Pré-preenchimento com memória
+# 3) Períodos (Férias / Licença)
 # =========================
 afastados = []
 for chave_norm, resp in respostas_dict.items():
@@ -351,17 +377,17 @@ st.markdown("---")
 st.subheader("3) Informar períodos (Férias / Licença)")
 
 if afastados and not st.session_state.periodos_aplicados:
-    st.write("Preencha início e fim e clique em **Aplicar períodos**. O anúncio será gerado em seguida.")
+    st.write("Preencha início e fim e clique em **Aplicar períodos**. No anúncio será exibido: `POSTO NOME - dd/mm/aaaa a dd/mm/aaaa`")
 
     with st.form("form_periodos"):
         novos_periodos = {}
         erros = []
 
         for chave_norm, dados, status in afastados:
-            posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
-            st.markdown(f"**{posto_nome}**  \n_{status}_")
+            posto_nome_display = f"{dados['posto_display']} {dados['nome_display']}"
+            st.markdown(f"**{posto_nome_display}**  \n_{status}_")
 
-            # ✅ Pré-preenchimento: usa memória se existir; senão data atual
+            # pré-preenchimento por memória
             if chave_norm in st.session_state.periodos_memoria:
                 ini_padrao, fim_padrao = st.session_state.periodos_memoria[chave_norm]
             else:
@@ -371,9 +397,10 @@ if afastados and not st.session_state.periodos_aplicados:
             inicio = c1.date_input("Início", value=ini_padrao, key=f"ini_{chave_norm}")
             fim = c2.date_input("Fim", value=fim_padrao, key=f"fim_{chave_norm}")
 
-            # ✅ Validação: fim não pode ser menor que início
             if not validar_periodo(inicio, fim):
-                erros.append(f"{posto_nome}: o fim ({fim.strftime('%d/%m/%Y')}) não pode ser anterior ao início ({inicio.strftime('%d/%m/%Y')}).")
+                erros.append(
+                    f"{posto_nome_display}: fim ({fim.strftime('%d/%m/%Y')}) não pode ser anterior ao início ({inicio.strftime('%d/%m/%Y')})."
+                )
 
             novos_periodos[chave_norm] = (inicio, fim)
             st.markdown("---")
@@ -387,11 +414,10 @@ if afastados and not st.session_state.periodos_aplicados:
                 st.write(f"• {e}")
             st.stop()
 
-        # salva períodos escolhidos
         st.session_state.periodos_inseridos = novos_periodos
         st.session_state.periodos_aplicados = True
 
-        # ✅ grava na memória (para pré-preenchimento nas próximas execuções)
+        # grava memória para pré-preencher no futuro
         for k, v in novos_periodos.items():
             st.session_state.periodos_memoria[k] = v
 
@@ -423,20 +449,24 @@ for nome_norm, dados in efetivo_dict.items():
     if not resposta:
         secao = dados.get('secao', 'SEM SEÇÃO')
         faltantes_por_secao[secao] = faltantes_por_secao.get(secao, 0) + 1
-        militares_nao_informados_nomes.append(f"{dados['posto_grad']} {dados['nome_completo']} ({secao})")
+
+        # conferência (mantém *)
+        militares_nao_informados_nomes.append(f"{dados['posto_display']} {dados['nome_display']} ({secao})")
         continue
 
     status = str(resposta['status']).strip()
-    posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
 
+    posto_nome_display = f"{dados['posto_display']} {dados['nome_display']}"  # COM *
+
+    # ✅ aplica período SEMPRE que for férias/licença e existir no dicionário
     if precisa_periodo(status) and nome_norm in periodos_inseridos:
         ini, fim = periodos_inseridos[nome_norm]
-        posto_nome_saida = f"{posto_nome} - {formatar_periodo(ini, fim)}"
+        posto_nome_saida = f"{posto_nome_display} - {formatar_periodo(ini, fim)}"
     else:
-        posto_nome_saida = posto_nome
+        posto_nome_saida = posto_nome_display
 
     if 'presente' in status.lower() or status == "Presente":
-        categorias_dados[categoria]['presentes'].append(posto_nome)
+        categorias_dados[categoria]['presentes'].append(posto_nome_display)
     else:
         categorias_dados[categoria]['afastamentos'].setdefault(status, []).append(posto_nome_saida)
 
@@ -455,24 +485,24 @@ total_militares = 0
 total_civis = 0
 
 for categoria in ['OFICIAIS', 'PRAÇAS', 'CIVIS']:
-    dados = categorias_dados[categoria]
+    dados_cat = categorias_dados[categoria]
 
     if categoria == 'CIVIS':
-        total_civis = len(dados['presentes'])
+        total_civis = len(dados_cat['presentes'])
     else:
-        total_militares += len(dados['presentes'])
+        total_militares += len(dados_cat['presentes'])
 
     anuncio += f"*{categoria}*\n"
     anuncio += "Efetivo total: \n"
-    anuncio += f"🔸{dados['total']} - CSC-PM\n\n"
+    anuncio += f"🔸{dados_cat['total']} - CSC-PM\n\n"
 
-    if dados['presentes']:
-        anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
-        for idx, nome in enumerate(dados['presentes'], 1):
+    if dados_cat['presentes']:
+        anuncio += f"🔹{len(dados_cat['presentes'])} Presentes:\n"
+        for idx, nome in enumerate(dados_cat['presentes'], 1):
             anuncio += f"    {idx}. {nome}\n"
         anuncio += "\n"
 
-    afast = dados['afastamentos']
+    afast = dados_cat['afastamentos']
     for status in sorted(afast.keys(), key=ordem_status):
         lista = afast[status]
         anuncio += f"🔹{len(lista)} {status}\n"
