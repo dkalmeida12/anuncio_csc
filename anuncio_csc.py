@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import re
 import unicodedata
 from difflib import SequenceMatcher
@@ -40,7 +40,7 @@ S MANUTENÇÃO,090.803-8,2ºSGT,QPR,ARNALDO BENTO PEREIRA
 S MANUTENÇÃO,097.538-3,3ºSGT,QPR,CARLOS R SANTIAGO DOS SANTOS
 S MANUTENÇÃO,127.860-5,3º SGT,QPPM,WAGNER VITOR DOS SANTOS"""
 
-st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.2")
+st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.3")
 st.markdown("---")
 
 # Carregar efetivo
@@ -50,6 +50,101 @@ df_efetivo = pd.read_csv(pd.io.common.StringIO(EFETIVO_CSC))
 st.write("📋 FAÇA O UPLOAD DA PLANILHA DO GOOGLE FORMULÁRIOS (XLS/XLSX):")
 uploaded_file = st.file_uploader("Escolha um arquivo Excel", type=["xls", "xlsx"])
 
+# ----------------------------
+# Funções auxiliares
+# ----------------------------
+def remover_acentos(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(ch for ch in s if not unicodedata.combining(ch))
+
+def normalizar_nome(nome):
+    if pd.isna(nome):
+        return ""
+    s = str(nome).strip().upper()
+    s = remover_acentos(s)
+    s = re.sub(r"[^A-Z\s]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def normalizar_posto(posto):
+    posto = str(posto).strip().upper()
+    posto = posto.replace('º', '°')
+    posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
+    posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
+    return posto
+
+def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
+    s = str(nome_coluna).strip()
+    if " PM " in s.upper():
+        idx = s.upper().rfind(" PM ")
+        return s[idx + 4:].strip()
+
+    s = re.sub(r'^[\s]*ASPM[\s]+', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^[\s]*\d+[º°][\s]*', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', '', s, flags=re.IGNORECASE)
+    return s.strip()
+
+def similaridade(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+def encontrar_militar(nome_extraido: str, efetivo_dict: dict, limiar: float = 0.88):
+    nome_norm = normalizar_nome(nome_extraido)
+    if nome_norm in efetivo_dict:
+        return nome_norm, efetivo_dict[nome_norm]
+
+    melhor_key = None
+    melhor_score = 0.0
+    for key in efetivo_dict.keys():
+        sc = similaridade(nome_norm, key)
+        if sc > melhor_score:
+            melhor_score = sc
+            melhor_key = key
+
+    if melhor_key and melhor_score >= limiar:
+        return melhor_key, efetivo_dict[melhor_key]
+
+    return None, None
+
+def prioridade_texto(resp_lower: str) -> int:
+    if 'férias' in resp_lower or 'ferias' in resp_lower:
+        return 1
+    if 'licença' in resp_lower or 'licenca' in resp_lower:
+        return 2
+    if 'ausente' in resp_lower:
+        return 3
+    if 'folga' in resp_lower:
+        return 4
+    if 'dispensa' in resp_lower:
+        return 5
+    if 'presente' in resp_lower:
+        return 6
+    return 50
+
+def ordem_status(s):
+    sl = s.lower()
+    if 'férias' in sl or 'ferias' in sl:
+        return 1
+    if 'licença' in sl or 'licenca' in sl:
+        return 2
+    if 'ausente' in sl:
+        return 3
+    if 'folga' in sl:
+        return 4
+    if 'dispensa' in sl:
+        return 5
+    return 50
+
+def formatar_periodo(inicio: date, fim: date) -> str:
+    return f"{inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
+
+def precisa_periodo(status: str) -> bool:
+    s = status.lower()
+    return ('férias' in s or 'ferias' in s or 'licença' in s or 'licenca' in s)
+
+# ----------------------------
+# Fluxo principal
+# ----------------------------
 if uploaded_file is not None:
     st.write("📊 Processando dados...")
     df_formulario = pd.read_excel(uploaded_file)
@@ -57,104 +152,7 @@ if uploaded_file is not None:
     data_atual = datetime.now()
     data_formatada = data_atual.strftime("%d/%m/%Y")
 
-    # ----------------------------
-    # Normalizações / Matching
-    # ----------------------------
-    def remover_acentos(s: str) -> str:
-        s = unicodedata.normalize("NFKD", s)
-        return "".join(ch for ch in s if not unicodedata.combining(ch))
-
-    def normalizar_nome(nome):
-        if pd.isna(nome):
-            return ""
-        s = str(nome).strip().upper()
-        s = remover_acentos(s)
-        s = re.sub(r"[^A-Z\s]", " ", s)
-        s = re.sub(r"\s+", " ", s).strip()
-        return s
-
-    def normalizar_posto(posto):
-        posto = str(posto).strip().upper()
-        posto = posto.replace('º', '°')
-        posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
-        posto = posto.replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
-        return posto
-
-    def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
-        s = str(nome_coluna).strip()
-
-        if " PM " in s.upper():
-            idx = s.upper().rfind(" PM ")
-            return s[idx + 4:].strip()
-
-        s = re.sub(r'^[\s]*ASPM[\s]+', '', s, flags=re.IGNORECASE)
-        s = re.sub(r'^[\s]*\d+[º°][\s]*', '', s, flags=re.IGNORECASE)
-        s = re.sub(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', '', s, flags=re.IGNORECASE)
-        s = re.sub(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', '', s, flags=re.IGNORECASE)
-
-        return s.strip()
-
-    def similaridade(a: str, b: str) -> float:
-        return SequenceMatcher(None, a, b).ratio()
-
-    def encontrar_militar(nome_extraido: str, efetivo_dict: dict, limiar: float = 0.88):
-        nome_norm = normalizar_nome(nome_extraido)
-
-        if nome_norm in efetivo_dict:
-            return nome_norm, efetivo_dict[nome_norm]
-
-        melhor_key = None
-        melhor_score = 0.0
-        for key in efetivo_dict.keys():
-            sc = similaridade(nome_norm, key)
-            if sc > melhor_score:
-                melhor_score = sc
-                melhor_key = key
-
-        if melhor_key and melhor_score >= limiar:
-            return melhor_key, efetivo_dict[melhor_key]
-
-        return None, None
-
-    # ----------------------------
-    # Período (opcional)
-    # ----------------------------
-    def extrair_periodo(texto):
-        if pd.isna(texto):
-            return None
-        texto = str(texto)
-
-        padrao1 = r'(\d{2}[a-zA-Z]{3})[\s]*[àaáÀÁ][\s]*(\d{2}[a-zA-Z]{3})'
-        padrao2 = r'(\d{2}/\d{2})[\s]*[àaáÀÁ][\s]*(\d{2}/\d{2})'
-
-        match = re.search(padrao1, texto, re.IGNORECASE)
-        if match:
-            return f"{match.group(1)} à {match.group(2)}"
-
-        match = re.search(padrao2, texto)
-        if match:
-            return f"{match.group(1)} à {match.group(2)}"
-
-        return None
-
-    def prioridade_texto(resp_lower: str) -> int:
-        if 'férias' in resp_lower or 'ferias' in resp_lower:
-            return 1
-        if 'licença' in resp_lower or 'licenca' in resp_lower:
-            return 2
-        if 'ausente' in resp_lower:
-            return 3
-        if 'folga' in resp_lower:
-            return 4
-        if 'dispensa' in resp_lower:
-            return 5
-        if 'presente' in resp_lower:
-            return 6
-        return 50
-
-    # ----------------------------
     # Processar efetivo -> dict
-    # ----------------------------
     efetivo_dict = {}
     for _, row in df_efetivo.iterrows():
         nome_completo = str(row['NOME']).strip()
@@ -179,9 +177,7 @@ if uploaded_file is not None:
                 'quadro': quadro
             }
 
-    # ----------------------------
     # Processar formulário (dia atual)
-    # ----------------------------
     df_formulario['Carimbo de data/hora'] = pd.to_datetime(df_formulario['Carimbo de data/hora'])
     df_formulario['Data do anúncio'] = pd.to_datetime(df_formulario['Data do anúncio'])
 
@@ -190,21 +186,19 @@ if uploaded_file is not None:
     if df_hoje.empty:
         st.warning(f"⚠️ ATENÇÃO: Não há registros para a data {data_formatada}")
         st.info("Verifique se a 'Data do anúncio' no formulário corresponde à data de hoje.")
+        st.stop()
     else:
         st.success(f"✅ Encontrados {len(df_hoje)} registro(s) para {data_formatada}")
 
     df_hoje = df_hoje.sort_values('Carimbo de data/hora', ascending=False)
 
-    # ----------------------------
     # Coletar respostas
-    # ----------------------------
     respostas_dict = {}
     secoes_processadas = set()
     colunas_militares = df_formulario.columns[4:]
 
     for _, row in df_hoje.iterrows():
         secao = str(row['Seção:'])
-
         if secao in secoes_processadas:
             continue
         secoes_processadas.add(secao)
@@ -225,12 +219,8 @@ if uploaded_file is not None:
             respostas = [r.strip() for r in valor_str.split(',') if r.strip()]
 
             candidatos = []
-            melhor_periodo = None
-
             for resp in respostas:
                 resp_lower = resp.lower()
-                periodo = extrair_periodo(resp)
-
                 if 'presente' in resp_lower:
                     candidatos.append(("Presente", 6))
                 elif 'ausente' in resp_lower:
@@ -246,9 +236,6 @@ if uploaded_file is not None:
                 else:
                     candidatos.append((resp, prioridade_texto(resp_lower)))
 
-                if periodo and not melhor_periodo:
-                    melhor_periodo = periodo
-
             if not candidatos:
                 continue
 
@@ -257,12 +244,48 @@ if uploaded_file is not None:
 
             respostas_dict[chave_efetivo] = {
                 'status': status_texto_exato,
-                'campo_outro': melhor_periodo,
                 'dados': militar_encontrado
             }
 
     # ----------------------------
-    # Organizar por categoria / status dinâmico
+    # INSERÇÃO DE PERÍODOS (FÉRIAS / LICENÇA) VIA UI
+    # ----------------------------
+    # Filtrar quem precisa de período
+    afastados = []
+    for chave_norm, resp in respostas_dict.items():
+        status = str(resp['status']).strip()
+        if precisa_periodo(status):
+            afastados.append((chave_norm, resp['dados'], status))
+
+    st.markdown("---")
+    st.subheader("📅 Informar períodos (Férias / Licença)")
+    st.write("Preencha início e fim. No anúncio final será exibido: `NOME - dd/mm/aaaa a dd/mm/aaaa`")
+
+    periodos_inseridos = {}  # chave_norm -> (inicio, fim)
+
+    if not afastados:
+        st.info("Nenhum militar com status de férias/licença nesta data.")
+    else:
+        # Usa um form para não recalcular a cada alteração
+        with st.form("form_periodos"):
+            for chave_norm, dados, status in afastados:
+                posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
+                st.markdown(f"**{posto_nome}**  \n_{status}_")
+
+                c1, c2 = st.columns(2)
+                inicio = c1.date_input("Início", value=data_atual.date(), key=f"ini_{chave_norm}")
+                fim = c2.date_input("Fim", value=data_atual.date(), key=f"fim_{chave_norm}")
+
+                periodos_inseridos[chave_norm] = (inicio, fim)
+                st.markdown("---")
+
+            submitted = st.form_submit_button("Aplicar períodos")
+
+        if not submitted:
+            st.stop()
+
+    # ----------------------------
+    # Organizar por categoria / status dinâmico (com período)
     # ----------------------------
     categorias_dados = {
         'OFICIAIS': {'presentes': [], 'afastamentos': {}, 'total': 0},
@@ -284,9 +307,11 @@ if uploaded_file is not None:
         status = str(resposta['status']).strip()
         posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
 
-        periodo = resposta.get('campo_outro')
-        if periodo:
-            posto_nome_saida = f"{posto_nome} {periodo}"
+        # Se for férias/licença e tiver período informado, anexar " - período"
+        if precisa_periodo(status) and nome_norm in periodos_inseridos:
+            ini, fim = periodos_inseridos[nome_norm]
+            periodo_txt = formatar_periodo(ini, fim)
+            posto_nome_saida = f"{posto_nome} - {periodo_txt}"
         else:
             posto_nome_saida = posto_nome
 
@@ -309,20 +334,6 @@ Anúncio CSC-PM
     total_militares = 0
     total_civis = 0
 
-    def ordem_status(s):
-        sl = s.lower()
-        if 'férias' in sl or 'ferias' in sl:
-            return 1
-        if 'licença' in sl or 'licenca' in sl:
-            return 2
-        if 'ausente' in sl:
-            return 3
-        if 'folga' in sl:
-            return 4
-        if 'dispensa' in sl:
-            return 5
-        return 50
-
     for categoria in ['OFICIAIS', 'PRAÇAS', 'CIVIS']:
         dados = categorias_dados[categoria]
 
@@ -335,21 +346,19 @@ Anúncio CSC-PM
         anuncio += "Efetivo total: \n"
         anuncio += f"🔸{dados['total']} - CSC-PM\n\n"
 
-        # Presentes
         if dados['presentes']:
             anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
             for idx, nome in enumerate(dados['presentes'], 1):
                 anuncio += f"    {idx}. {nome}\n"
-            anuncio += "\n"  # <-- ESPAÇO ENTRE TÓPICOS 🔹
+            anuncio += "\n"
 
-        # Afastamentos
         afast = dados['afastamentos']
         for status in sorted(afast.keys(), key=ordem_status):
             lista = afast[status]
             anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
                 anuncio += f"    {idx}. {info}\n"
-            anuncio += "\n"  # <-- ESPAÇO ENTRE TÓPICOS 🔹
+            anuncio += "\n"
 
         anuncio += "\n"
 
