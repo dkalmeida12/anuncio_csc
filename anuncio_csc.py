@@ -364,20 +364,20 @@ Anúncio CSC-PM
             total_militares += len(dados['presentes'])
 
         anuncio += f"{categoria}\n"
-        anuncio += "Efetivo total:"
+        anuncio += "Efetivo total: \n"
         anuncio += f"🔸{dados['total']} - CSC-PM\n"
 
         if dados['presentes']:
-            anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
+            anuncio += f"🔹{len(dados['presentes'])} Presentes:\n\n"
             for idx, nome in enumerate(dados['presentes'], 1):
-                anuncio += f"    {idx}. {nome}\n\n"
+                anuncio += f"    {idx}. {nome}\n"
 
         afast = dados['afastamentos']
         for status in sorted(afast.keys(), key=ordem_status):
             lista = afast[status]
-            anuncio += f"🔹{len(lista)} {status}\n\n"
+            anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
-                anuncio += f"    {idx}. {info}\n"
+                anuncio += f"    {idx}. {info}\n\n"
 
         anuncio += "\n"
 
