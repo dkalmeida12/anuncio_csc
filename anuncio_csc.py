@@ -368,7 +368,7 @@ Anúncio CSC-PM
         anuncio += f"🔸{dados['total']} - CSC-PM\n"
 
         if dados['presentes']:
-            anuncio += f"🔹{len(dados['presentes'])} Presentes:\n\n"
+            anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
             for idx, nome in enumerate(dados['presentes'], 1):
                 anuncio += f"    {idx}. {nome}\n"
 
@@ -377,9 +377,9 @@ Anúncio CSC-PM
             lista = afast[status]
             anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
-                anuncio += f"    {idx}. {info}\n\n"
+                anuncio += f"    {idx}. {info}\n"
 
-        anuncio += "\n"
+        anuncio += "\n\n"
 
     anuncio += f"""Anúncio passado:
 [PREENCHER MANUALMENTE]
