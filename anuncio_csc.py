@@ -60,10 +60,7 @@ if uploaded_file is not None:
     data_atual = datetime.now() # or st.date_input("Data do Anúncio", datetime.now()) if the user wants to specify the date
     data_formatada = data_atual.strftime("%d/%m/%Y")
 
-    st.write(f"\n🔍 Colunas encontradas no formulário:")
-    for i, col in enumerate(df_formulario.columns):
-        st.write(f"   {i}: {col}")
-
+  
     # ----------------------------
     # Normalizações / Matching (These functions are independent of Streamlit/Colab)
     # ----------------------------
@@ -378,7 +375,7 @@ Anúncio CSC-PM
             anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
                 anuncio += f"    {idx}. {info}\n"
-        afast = "\n"
+
         anuncio += "\n"
 
     anuncio += f"""Anúncio passado:
