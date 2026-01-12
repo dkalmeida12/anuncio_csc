@@ -371,15 +371,15 @@ Anúncio CSC-PM
             anuncio += f"🔹{len(dados['presentes'])} Presentes:\n"
             for idx, nome in enumerate(dados['presentes'], 1):
                 anuncio += f"    {idx}. {nome}\n"
-
+        
         afast = dados['afastamentos']
         for status in sorted(afast.keys(), key=ordem_status):
             lista = afast[status]
             anuncio += f"🔹{len(lista)} {status}\n"
             for idx, info in enumerate(lista, 1):
                 anuncio += f"    {idx}. {info}\n"
-
-        anuncio += "\n\n"
+        afast = "\n"
+        anuncio += "\n"
 
     anuncio += f"""Anúncio passado:
 [PREENCHER MANUALMENTE]
