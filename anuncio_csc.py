@@ -40,7 +40,7 @@ S MANUTENÇÃO,090.803-8,2ºSGT,QPR,ARNALDO BENTO PEREIRA
 S MANUTENÇÃO,097.538-3,3ºSGT,QPR,CARLOS R SANTIAGO DOS SANTOS
 S MANUTENÇÃO,127.860-5,3º SGT,QPPM,WAGNER VITOR DOS SANTOS"""
 
-st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.3")
+st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.4")
 st.markdown("---")
 
 # Carregar efetivo
@@ -250,7 +250,6 @@ if uploaded_file is not None:
     # ----------------------------
     # INSERÇÃO DE PERÍODOS (FÉRIAS / LICENÇA) VIA UI
     # ----------------------------
-    # Filtrar quem precisa de período
     afastados = []
     for chave_norm, resp in respostas_dict.items():
         status = str(resp['status']).strip()
@@ -261,12 +260,9 @@ if uploaded_file is not None:
     st.subheader("📅 Informar períodos (Férias / Licença)")
     st.write("Preencha início e fim. No anúncio final será exibido: `NOME - dd/mm/aaaa a dd/mm/aaaa`")
 
-    periodos_inseridos = {}  # chave_norm -> (inicio, fim)
+    periodos_inseridos = {}
 
-    if not afastados:
-        st.info("Nenhum militar com status de férias/licença nesta data.")
-    else:
-        # Usa um form para não recalcular a cada alteração
+    if afastados:
         with st.form("form_periodos"):
             for chave_norm, dados, status in afastados:
                 posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
@@ -283,6 +279,8 @@ if uploaded_file is not None:
 
         if not submitted:
             st.stop()
+    else:
+        st.info("Nenhum militar com status de férias/licença nesta data.")
 
     # ----------------------------
     # Organizar por categoria / status dinâmico (com período)
@@ -307,7 +305,6 @@ if uploaded_file is not None:
         status = str(resposta['status']).strip()
         posto_nome = f"{dados['posto_grad']} {dados['nome_completo']}"
 
-        # Se for férias/licença e tiver período informado, anexar " - período"
         if precisa_periodo(status) and nome_norm in periodos_inseridos:
             ini, fim = periodos_inseridos[nome_norm]
             periodo_txt = formatar_periodo(ini, fim)
@@ -322,6 +319,7 @@ if uploaded_file is not None:
 
     # ----------------------------
     # Gerar anúncio (COM ESPAÇO ENTRE TÓPICOS 🔹)
+    # + INCLUIR "NÃO RESPONDERAM" DE FORMA CONCISA
     # ----------------------------
     anuncio = f"""Bom dia!
 Segue anúncio do dia
@@ -362,6 +360,18 @@ Anúncio CSC-PM
 
         anuncio += "\n"
 
+    # ----------------------------
+    # BLOCO CONCISO: NÃO RESPONDERAM (incluído no anúncio)
+    # ----------------------------
+    if militares_nao_informados:
+        # Opcional: ordenar alfabeticamente para ficar mais “limpo”
+        militares_nao_informados_ordenados = sorted(militares_nao_informados)
+
+        # Constrói lista em uma única linha, separada por "; "
+        lista_concisa = "; ".join(militares_nao_informados_ordenados)
+
+        anuncio += f"❌ Não responderam ({len(militares_nao_informados_ordenados)}): {lista_concisa}\n\n"
+
     anuncio += f"""Anúncio passado:
 [PREENCHER MANUALMENTE]
 [PREENCHER HORA]
@@ -374,11 +384,11 @@ Anúncio CSC-PM
     st.subheader("📢 ANÚNCIO GERADO:")
     st.code(anuncio, language='text')
 
+    # Mantém também na UI (útil para conferência), mas agora já vai no anúncio.
     if militares_nao_informados:
-        st.error("❌ MILITARES QUE NÃO RESPONDERAM:")
-        for militar in militares_nao_informados:
+        st.warning("❌ Militares que não responderam (já incluídos no anúncio):")
+        for militar in sorted(militares_nao_informados):
             st.write(f"   • {militar}")
-        st.warning(f"❌ Total de {len(militares_nao_informados)} militar(es) faltando no anúncio.")
 
     st.download_button(
         label="Baixar Anúncio de Presença",
