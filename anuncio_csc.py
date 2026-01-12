@@ -40,7 +40,7 @@ S MANUTENÇÃO,090.803-8,2ºSGT,QPR,ARNALDO BENTO PEREIRA
 S MANUTENÇÃO,097.538-3,3ºSGT,QPR,CARLOS R SANTIAGO DOS SANTOS
 S MANUTENÇÃO,127.860-5,3º SGT,QPPM,WAGNER VITOR DOS SANTOS"""
 
-st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.4")
+st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.5")
 st.markdown("---")
 
 # Carregar efetivo
@@ -152,12 +152,13 @@ if uploaded_file is not None:
     data_atual = datetime.now()
     data_formatada = data_atual.strftime("%d/%m/%Y")
 
-    # Processar efetivo -> dict
+    # Processar efetivo -> dict (AGORA INCLUI "secao")
     efetivo_dict = {}
     for _, row in df_efetivo.iterrows():
         nome_completo = str(row['NOME']).strip()
         quadro = str(row['QUADRO']).strip().upper()
         posto_grad = normalizar_posto(str(row['P  / G']))
+        secao_efetivo = str(row['SEÇÃO']).strip().upper()
 
         if quadro in ['QOPM', 'QOR', 'QOC']:
             categoria = 'OFICIAIS'
@@ -174,13 +175,13 @@ if uploaded_file is not None:
                 'categoria': categoria,
                 'posto_grad': posto_grad,
                 'nome_completo': nome_completo,
-                'quadro': quadro
+                'quadro': quadro,
+                'secao': secao_efetivo
             }
 
     # Processar formulário (dia atual)
     df_formulario['Carimbo de data/hora'] = pd.to_datetime(df_formulario['Carimbo de data/hora'])
     df_formulario['Data do anúncio'] = pd.to_datetime(df_formulario['Data do anúncio'])
-
     df_hoje = df_formulario[df_formulario['Data do anúncio'].dt.date == data_atual.date()].copy()
 
     if df_hoje.empty:
@@ -284,6 +285,7 @@ if uploaded_file is not None:
 
     # ----------------------------
     # Organizar por categoria / status dinâmico (com período)
+    # + CAPTURAR "SEÇÕES QUE NÃO RESPONDERAM"
     # ----------------------------
     categorias_dados = {
         'OFICIAIS': {'presentes': [], 'afastamentos': {}, 'total': 0},
@@ -291,7 +293,11 @@ if uploaded_file is not None:
         'CIVIS': {'presentes': [], 'afastamentos': {}, 'total': 0}
     }
 
-    militares_nao_informados = []
+    # Para o anúncio (conciso): contagem por seção
+    faltantes_por_secao = {}  # secao -> qtd pessoas que não responderam
+
+    # (Opcional, apenas UI): nomes dos faltantes para conferência
+    militares_nao_informados_nomes = []
 
     for nome_norm, dados in efetivo_dict.items():
         categoria = dados['categoria']
@@ -299,7 +305,9 @@ if uploaded_file is not None:
 
         resposta = respostas_dict.get(nome_norm)
         if not resposta:
-            militares_nao_informados.append(f"{dados['posto_grad']} {dados['nome_completo']}")
+            secao = dados.get('secao', 'SEM SEÇÃO')
+            faltantes_por_secao[secao] = faltantes_por_secao.get(secao, 0) + 1
+            militares_nao_informados_nomes.append(f"{dados['posto_grad']} {dados['nome_completo']} ({secao})")
             continue
 
         status = str(resposta['status']).strip()
@@ -319,7 +327,7 @@ if uploaded_file is not None:
 
     # ----------------------------
     # Gerar anúncio (COM ESPAÇO ENTRE TÓPICOS 🔹)
-    # + INCLUIR "NÃO RESPONDERAM" DE FORMA CONCISA
+    # + INCLUIR "SEÇÕES QUE NÃO RESPONDERAM" (CONCISO)
     # ----------------------------
     anuncio = f"""Bom dia!
 Segue anúncio do dia
@@ -361,16 +369,14 @@ Anúncio CSC-PM
         anuncio += "\n"
 
     # ----------------------------
-    # BLOCO CONCISO: NÃO RESPONDERAM (incluído no anúncio)
+    # BLOCO CONCISO: SEÇÕES SEM RESPOSTA
+    # Ex.: "❌ Seções sem resposta (3): LICITAÇÃO(2); ALMOX(1); S MANUTENÇÃO(1)"
     # ----------------------------
-    if militares_nao_informados:
-        # Opcional: ordenar alfabeticamente para ficar mais “limpo”
-        militares_nao_informados_ordenados = sorted(militares_nao_informados)
-
-        # Constrói lista em uma única linha, separada por "; "
-        lista_concisa = "; ".join(militares_nao_informados_ordenados)
-
-        anuncio += f"❌ Não responderam ({len(militares_nao_informados_ordenados)}): {lista_concisa}\n\n"
+    if faltantes_por_secao:
+        # Ordena por maior quantidade, depois nome
+        itens = sorted(faltantes_por_secao.items(), key=lambda x: (-x[1], x[0]))
+        lista_concisa = "; ".join([f"{secao}({qtd})" for secao, qtd in itens])
+        anuncio += f"❌ Seções sem resposta ({len(itens)}): {lista_concisa}\n\n"
 
     anuncio += f"""Anúncio passado:
 [PREENCHER MANUALMENTE]
@@ -384,11 +390,11 @@ Anúncio CSC-PM
     st.subheader("📢 ANÚNCIO GERADO:")
     st.code(anuncio, language='text')
 
-    # Mantém também na UI (útil para conferência), mas agora já vai no anúncio.
-    if militares_nao_informados:
-        st.warning("❌ Militares que não responderam (já incluídos no anúncio):")
-        for militar in sorted(militares_nao_informados):
-            st.write(f"   • {militar}")
+    # (Opcional) UI para conferência sem poluir o anúncio
+    if faltantes_por_secao:
+        with st.expander("Ver militares que não responderam (conferência)"):
+            for item in sorted(militares_nao_informados_nomes):
+                st.write(f"• {item}")
 
     st.download_button(
         label="Baixar Anúncio de Presença",
