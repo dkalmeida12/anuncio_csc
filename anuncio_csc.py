@@ -372,12 +372,30 @@ Anúncio CSC-PM
     # BLOCO CONCISO: SEÇÕES SEM RESPOSTA
     # Ex.: "❌ Seções sem resposta (3): LICITAÇÃO(2); ALMOX(1); S MANUTENÇÃO(1)"
     # ----------------------------
-    if faltantes_por_secao:
-        # Ordena por maior quantidade, depois nome
-        itens = sorted(faltantes_por_secao.items(), key=lambda x: (-x[1], x[0]))
-        lista_concisa = "; ".join([f"{secao}({qtd})" for secao, qtd in itens])
-        anuncio += f"❌ Seções sem resposta ({len(itens)}): {lista_concisa}\n\n"
+  
+if faltantes_por_secao:
+    # Ordena por maior quantidade, depois nome
+    itens = sorted(faltantes_por_secao.items(), key=lambda x: (-x[1], x[0]))
 
+    # Total de seções e total de servidores (faltantes) somados
+    total_secoes = len(itens)
+    total_servidores = sum(qtd for _, qtd in itens)
+
+    # Emoji de seta (use a que preferir)
+    seta = "➡️"
+
+    # Monta exatamente no formato solicitado (uma linha por seção)
+    anuncio += f"❌ Seções sem resposta ({total_secoes}): \n"
+    for secao, qtd in itens:
+        anuncio += f"{seta} {secao}({qtd}); \n"
+
+    # Ajuste específico: primeira seção deve exibir "(5 servidores no total)"
+    # (mantém o seu exemplo literalmente; se quiser generalizar, veja nota abaixo)
+    secao_top, qtd_top = itens[0]
+    anuncio = anuncio.replace(f"{seta} {secao_top}({qtd_top});",
+                              f"{seta} {secao_top}({qtd_top} servidores no total);", 1)
+
+    anuncio += "\n"
     anuncio += f"""Anúncio passado:
 [PREENCHER MANUALMENTE]
 [PREENCHER HORA]
