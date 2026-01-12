@@ -331,7 +331,7 @@ Anúncio CSC-PM
         else:
             total_militares += len(dados['presentes'])
 
-        anuncio += f"{categoria}\n"
+        anuncio += f"*{categoria}*\n"
         anuncio += "Efetivo total: \n"
         anuncio += f"🔸{dados['total']} - CSC-PM\n"
 
