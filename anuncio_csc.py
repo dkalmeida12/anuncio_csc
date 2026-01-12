@@ -333,7 +333,7 @@ Anúncio CSC-PM
 
         anuncio += f"*{categoria}*\n"
         anuncio += "Efetivo total: \n"
-        anuncio += f"🔸{dados['total']} - CSC-PM\n"
+        anuncio += f"🔸{dados['total']} - CSC-PM\n\n"
 
         # Presentes
         if dados['presentes']:
