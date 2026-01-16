@@ -353,6 +353,7 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
             "Efetivo total: ",
             f"🔸{dados_cat['total']} - CSC-PM",
             ""
+            st.write("DEBUG - Respostas de hoje:", df_hoje[['Carimbo de data/hora', 'Seção:', df_hoje.columns[4]]].head(10)) /
         ])
         
         if dados_cat['presentes']:
