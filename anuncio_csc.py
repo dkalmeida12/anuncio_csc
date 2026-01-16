@@ -482,14 +482,18 @@ def main():
         if precisa_periodo(resp['status'])
     ]
     
-    st.markdown("---")
-    st.subheader("3) Informar períodos (Férias / Licença)")
+ if submitted:
+    if erros:
+        st.error("❌ Corrija os períodos abaixo antes de prosseguir:")
+        for e in erros:
+            st.write(f"• {e}")
+        st.stop()
     
-    if afastados and not st.session_state.periodos_aplicados:
-        st.write("Preencha início e fim e clique em **Aplicar períodos**. No anúncio será exibido: `POSTO NOME - dd/mm/aaaa a dd/mm/aaaa`")
-        
-        with st.form("form_periodos"):
-            novos_periodos = {}
+    st.session_state.periodos_inseridos = novos_periodos
+    st.session_state.periodos_aplicados = True
+    st.session_state.periodos_memoria.update(novos_periodos)
+    st.success("✅ Períodos aplicados com sucesso!")
+    # Removido o st.rerun() - deixa continuar para gerar o anúncio
             erros = []
             
             for chave_norm, dados, status in afastados:
