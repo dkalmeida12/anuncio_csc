@@ -437,25 +437,25 @@ def main():
     st.markdown("---")
     
     # Sidebar com controles
+   
     with st.sidebar:
-        if st.button("Limpar carregamento (reset)"):
-            for key in ["df_formulario", "fonte_ok", "periodos_aplicados", "periodos_inseridos"]:
-                st.session_state[key] = None if key == "df_formulario" else (False if "ok" in key or "aplicados" in key else {})
-            st.rerun()
-        
-        if st.button("Limpar memória de períodos"):
-            st.session_state.periodos_memoria = {}
-            st.success("Memória de períodos limpa.")
-            st.rerun()
+    if st.button("Limpar carregamento (reset)"):
+        for key in ["df_formulario", "fonte_ok", "periodos_aplicados", "periodos_inseridos"]:
+            st.session_state[key] = None if key == "df_formulario" else (
+                False if "ok" in key or "aplicados" in key else {}
+            )
+        st.rerun()
 
-   with st.sidebar:
+    if st.button("Limpar memória de períodos"):
+        st.session_state.periodos_memoria = {}
+        st.success("Memória de períodos limpa.")
+        st.rerun()
+
     if st.button("Limpar cache (efetivo / normalização)"):
         st.cache_data.clear()
         st.success("Cache limpo. Recarregando...")
         st.rerun()
 
-
-    
     # Seção 1: Carregar planilha
     st.subheader("1) Carregar planilha do formulário")
     
