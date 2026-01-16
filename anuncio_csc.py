@@ -279,11 +279,9 @@ def processar_respostas(df_hoje: pd.DataFrame, efetivo_dict: Dict) -> Dict:
             if candidatos:
                 # Seleciona resposta com maior prioridade (menor número)
                 status_texto_exato = min(candidatos, key=lambda x: x[1])[0]
-                
-                # CORREÇÃO: Sempre usar os dados do efetivo_dict pela chave normalizada
                 respostas_dict[chave_efetivo] = {
                     'status': status_texto_exato,
-                    'dados': efetivo_dict[chave_efetivo]
+                    'dados': militar_encontrado
                 }
     
     return respostas_dict
@@ -354,7 +352,10 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
             f"*{categoria}*",
             "Efetivo total: ",
             f"🔸{dados_cat['total']} - CSC-PM",
-            ""
+          
+            # Logo após a linha 360 (df_hoje = df_hoje.sort_values...)
+            st.write("DEBUG - Primeiras respostas:")
+            st.dataframe(df_hoje[['Carimbo de data/hora', 'Seção:']].head(10))
         ])
         
         if dados_cat['presentes']:
@@ -482,18 +483,14 @@ def main():
         if precisa_periodo(resp['status'])
     ]
     
- if submitted:
-    if erros:
-        st.error("❌ Corrija os períodos abaixo antes de prosseguir:")
-        for e in erros:
-            st.write(f"• {e}")
-        st.stop()
+    st.markdown("---")
+    st.subheader("3) Informar períodos (Férias / Licença)")
     
-    st.session_state.periodos_inseridos = novos_periodos
-    st.session_state.periodos_aplicados = True
-    st.session_state.periodos_memoria.update(novos_periodos)
-    st.success("✅ Períodos aplicados com sucesso!")
-    # Removido o st.rerun() - deixa continuar para gerar o anúncio
+    if afastados and not st.session_state.periodos_aplicados:
+        st.write("Preencha início e fim e clique em **Aplicar períodos**. No anúncio será exibido: `POSTO NOME - dd/mm/aaaa a dd/mm/aaaa`")
+        
+        with st.form("form_periodos"):
+            novos_periodos = {}
             erros = []
             
             for chave_norm, dados, status in afastados:
