@@ -352,8 +352,10 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
             f"*{categoria}*",
             "Efetivo total: ",
             f"🔸{dados_cat['total']} - CSC-PM",
-            ""
-            st.write("DEBUG - Respostas de hoje:", df_hoje[['Carimbo de data/hora', 'Seção:', df_hoje.columns[4]]].head(10)) /
+          
+            # Logo após a linha 360 (df_hoje = df_hoje.sort_values...)
+            st.write("DEBUG - Primeiras respostas:")
+            st.dataframe(df_hoje[['Carimbo de data/hora', 'Seção:']].head(10))
         ])
         
         if dados_cat['presentes']:
