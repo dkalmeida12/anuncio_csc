@@ -42,7 +42,7 @@ def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
 # =========================
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
 CHEFE,126.554-5,*TEN CEL*,QOPM,*LEONARDO* de *CASTRO* Ferreira
-SUBCHEFE,089.655-5,*MAJ*,QOR,Jorge Aparacido *GOMES*
+SUBCHEFE,089.655-5,*MAJ*,QOR,Jorge Aparecido *GOMES*
 LICITAÇÃO,161.300-9,*CAP*,QOPM,Thiago Fernandes *PALMEIRA*
 LICITAÇÃO,100.433-2,*2ºTEN*,QOR,*CLAUDIO* Marcio da Silva
 LICITAÇÃO,087.650-8,*SUBTEN*,QPR,Sérgio Bernardino de *SENA*
