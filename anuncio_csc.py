@@ -155,19 +155,61 @@ def similaridade(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 def encontrar_militar(nome_extraido: str, efetivo_dict: Dict, limiar: float = 0.88) -> Tuple[Optional[str], Optional[Dict]]:
-    """Encontra militar no dicionário de efetivo usando matching exato ou por similaridade."""
+    """
+    Matching mais robusto:
+    1) exato (normalizado)
+    2) por tokens (interseção forte) — reduz erros de fuzzy
+    3) fuzzy (SequenceMatcher) como último recurso
+    """
     nome_norm = normalizar_nome(nome_extraido)
-    
-    # Busca exata (mais rápida)
+    if not nome_norm:
+        return None, None
+
+    # 1) Exato
     if nome_norm in efetivo_dict:
         return nome_norm, efetivo_dict[nome_norm]
-    
-    # Busca por similaridade
-    melhor_key, melhor_score = max(
-        ((key, similaridade(nome_norm, key)) for key in efetivo_dict),
-        key=lambda x: x[1],
-        default=(None, 0.0)
-    )
+
+    # 2) Token-first: exige que o último token (sobrenome final) exista e prioriza alta sobreposição
+    tokens = nome_norm.split()
+    if len(tokens) >= 2:
+        ultimo = tokens[-1]  # ex.: GOMES
+        candidatos = []
+        for key in efetivo_dict.keys():
+            key_tokens = key.split()
+            if not key_tokens:
+                continue
+            if ultimo not in key_tokens:
+                continue
+
+            inter = set(tokens) & set(key_tokens)
+            # score por sobreposição (Jaccard simplificado) + bônus se primeiro nome bater
+            score = len(inter) / max(len(set(tokens)), 1)
+            if tokens[0] == key_tokens[0]:
+                score += 0.15
+
+            candidatos.append((key, score))
+
+        if candidatos:
+            candidatos.sort(key=lambda x: x[1], reverse=True)
+            melhor_key, melhor_score = candidatos[0]
+            # Um limiar mais baixo aqui funciona bem porque já filtramos por sobrenome
+            if melhor_score >= 0.60:
+                return melhor_key, efetivo_dict[melhor_key]
+
+    # 3) Fuzzy como último recurso
+    melhor_key = None
+    melhor_score = 0.0
+    for key in efetivo_dict.keys():
+        sc = similaridade(nome_norm, key)
+        if sc > melhor_score:
+            melhor_score = sc
+            melhor_key = key
+
+    if melhor_key and melhor_score >= limiar:
+        return melhor_key, efetivo_dict[melhor_key]
+
+    return None, None
+
     
     return (melhor_key, efetivo_dict[melhor_key]) if melhor_score >= limiar else (None, None)
 
