@@ -448,11 +448,12 @@ def main():
             st.success("Memória de períodos limpa.")
             st.rerun()
 
-    with st.sidebar:
+   with st.sidebar:
     if st.button("Limpar cache (efetivo / normalização)"):
         st.cache_data.clear()
         st.success("Cache limpo. Recarregando...")
         st.rerun()
+
 
     
     # Seção 1: Carregar planilha
