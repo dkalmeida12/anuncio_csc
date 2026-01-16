@@ -279,9 +279,11 @@ def processar_respostas(df_hoje: pd.DataFrame, efetivo_dict: Dict) -> Dict:
             if candidatos:
                 # Seleciona resposta com maior prioridade (menor número)
                 status_texto_exato = min(candidatos, key=lambda x: x[1])[0]
+                
+                # CORREÇÃO: Sempre usar os dados do efetivo_dict pela chave normalizada
                 respostas_dict[chave_efetivo] = {
                     'status': status_texto_exato,
-                    'dados': militar_encontrado
+                    'dados': efetivo_dict[chave_efetivo]
                 }
     
     return respostas_dict
@@ -352,10 +354,7 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
             f"*{categoria}*",
             "Efetivo total: ",
             f"🔸{dados_cat['total']} - CSC-PM",
-          
-            # Logo após a linha 360 (df_hoje = df_hoje.sort_values...)
-            st.write("DEBUG - Primeiras respostas:")
-            st.dataframe(df_hoje[['Carimbo de data/hora', 'Seção:']].head(10))
+            ""
         ])
         
         if dados_cat['presentes']:
