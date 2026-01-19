@@ -63,8 +63,8 @@ SOFI,146.417-1,*3º SGT*,QPPM,*TIAGO* Henrique da Silva
 SOFI,146.299-3,*3º SGT*,QPPM,*GUSTAVO* Guimarães Afeito
 ALMOX,099.519-1,*2ºTEN*,QOR,Walmir Márcio da *CRUZ*
 ALMOX,099.309-7,*1ºSGT*,QPR,*OMAIR* Celso dos Santos
-ALMOX,113.505-2,*1ºSGT*,QPR,Carlos *LAÉRCIO* de Souza
 ALMOX,167.118-9,*ASPM*,CIVIL,*DANIELLE* Gomes Figueiroa
+S PRODUÇÃO GRÁFICA,113.505-2,*1ºSGT*,QPR,Carlos *LAÉRCIO* de Souza
 S PRODUÇÃO GRÁFICA,094.227-6,*2ºTEN*,QOR,Vilmo Gonçalves *LEMOS*
 S MANUTENÇÃO,087.957-7,*2ºTEN*,QOR,Joaquim *ARAÚJO* de Oliveira
 S MANUTENÇÃO,102.773-9,*2ºSGT*,QPR,*NIVAL* Neves de Carvalho
