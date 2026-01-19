@@ -8,35 +8,32 @@ import io
 import requests
 from typing import Tuple, Dict, Optional, List
 
+
 # =========================
 # CONFIG: GOOGLE SHEETS (PÚBLICO)
 # =========================
 DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/10izQWPLAk3nv46Pl7ShzchReY3SjZdDl9KgboGQMAWg/edit?usp=sharing"
-
 SHEET_ID_PATTERN = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
-POSTO_PATTERNS = [
-    (re.compile(r'^[\s]*ASPM[\s]+', re.IGNORECASE), ''),
-    (re.compile(r'^[\s]*\d+[º°][\s]*', re.IGNORECASE), ''),
-    (re.compile(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', re.IGNORECASE), ''),
-    (re.compile(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', re.IGNORECASE), '')
-]
+
 
 def extrair_sheet_id(url: str) -> str:
     m = SHEET_ID_PATTERN.search(str(url))
     return m.group(1) if m else ""
 
+
 def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
     sheet_id = extrair_sheet_id(sheet_url)
     if not sheet_id:
-        raise ValueError("Não foi possível extrair o SHEET_ID da URL informada.")
+        raise ValueError("Não foi possível extrair o ID da planilha a partir da URL informada.")
     export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     r = requests.get(export_url, timeout=30)
     r.raise_for_status()
     return r.content
 
+
 # =========================
 # EFETIVO CSC-PM (INTEGRADO NO CÓDIGO)
-# Mantém * para negrito no WhatsApp
+# IMPORTANTE: os * devem ser mantidos (WhatsApp negrito)
 # =========================
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
 CHEFE,126.554-5,*TEN CEL*,QOPM,*LEONARDO* de *CASTRO* Ferreira
@@ -63,32 +60,48 @@ SOFI,146.417-1,*3º SGT*,QPPM,*TIAGO* Henrique da Silva
 SOFI,146.299-3,*3º SGT*,QPPM,*GUSTAVO* Guimarães Afeito
 ALMOX,099.519-1,*2ºTEN*,QOR,Walmir Márcio da *CRUZ*
 ALMOX,099.309-7,*1ºSGT*,QPR,*OMAIR* Celso dos Santos
+ALMOX,113.505-2,*1ºSGT*,QPR,Carlos *LAÉRCIO* de Souza
 ALMOX,167.118-9,*ASPM*,CIVIL,*DANIELLE* Gomes Figueiroa
-S PRODUÇÃO GRÁFICA,113.505-2,*1ºSGT*,QPR,Carlos *LAÉRCIO* de Souza
 S PRODUÇÃO GRÁFICA,094.227-6,*2ºTEN*,QOR,Vilmo Gonçalves *LEMOS*
 S MANUTENÇÃO,087.957-7,*2ºTEN*,QOR,Joaquim *ARAÚJO* de Oliveira
 S MANUTENÇÃO,102.773-9,*2ºSGT*,QPR,*NIVAL* Neves de Carvalho
 S MANUTENÇÃO,090.803-8,*2ºSGT*,QPR,Arnaldo *BENTO* Pereira
 S MANUTENÇÃO,097.538-3,*2ºSGT*,QPR,Carlos R. *SANTIAGO* dos Santos
-S MANUTENÇÃO,127.860-5,*3ºSGT*,QPPM,Wagner *VITOR* dos Santos"""
+S MANUTENÇÃO,127.860-5,*3ºSGT*,QPPM,Wagner *VITOR* dos Santos
+"""
 
+# =========================
+# CONSTANTES
+# =========================
 QUADRO_CATEGORIA = {
-    'QOPM': 'OFICIAIS', 'QOR': 'OFICIAIS', 'QOC': 'OFICIAIS',
-    'QPR': 'PRAÇAS', 'QPPM': 'PRAÇAS', 'QPE': 'PRAÇAS',
-    'CIVIL': 'CIVIS'
+    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS",
+    "QPR": "PRAÇAS", "QPPM": "PRAÇAS", "QPE": "PRAÇAS",
+    "CIVIL": "CIVIS"
 }
 
 STATUS_KEYWORDS = [
-    (['férias', 'ferias'], 1),
-    (['licença', 'licenca'], 2),
-    (['ausente'], 3),
-    (['folga'], 4),
-    (['dispensa'], 5),
-    (['presente'], 6)
+    (["férias", "ferias"], 1),
+    (["licença", "licenca"], 2),
+    (["ausente"], 3),
+    (["folga"], 4),
+    (["dispensa"], 5),
+    (["presente"], 6),
 ]
 
+# Regex para tokens em negrito (WhatsApp)
+STAR_TOKEN_PATTERN = re.compile(r"\*([^*]+)\*")
+
+# Padrões para extrair nome do cabeçalho do formulário
+POSTO_PATTERNS = [
+    (re.compile(r'^[\s]*ASPM[\s]+', re.IGNORECASE), ''),
+    (re.compile(r'^[\s]*\d+[º°][\s]*', re.IGNORECASE), ''),
+    (re.compile(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', re.IGNORECASE), ''),
+    (re.compile(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', re.IGNORECASE), ''),
+]
+
+
 # =========================
-# Session State Init
+# SESSION STATE
 # =========================
 def init_session_state():
     defaults = {
@@ -97,56 +110,70 @@ def init_session_state():
         "periodos_aplicados": False,
         "periodos_inseridos": {},
         "periodos_memoria": {},
-        "last_source_mode": None,
-        "last_sheet_url": DEFAULT_SHEET_URL
+        "last_sheet_url": DEFAULT_SHEET_URL,
     }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
 
 # =========================
-# Funções auxiliares
+# AUXILIARES (normalização / matching)
 # =========================
 def remover_asteriscos(s: str) -> str:
-    return s.replace('*', '') if s else ""
+    return s.replace("*", "") if s else ""
+
 
 def remover_acentos(s: str) -> str:
     return "".join(ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch))
 
+
 @st.cache_data
 def normalizar_nome(nome: str) -> str:
+    """
+    Normalização para matching:
+    - remove *
+    - upper
+    - remove acentos
+    - remove pontuação
+    """
     if pd.isna(nome):
         return ""
-    s = remover_asteriscos(str(nome).strip().upper())
+    s = remover_asteriscos(str(nome)).strip().upper()
     s = remover_acentos(s)
     s = re.sub(r"[^A-Z\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
-def normalizar_posto(posto: str) -> str:
-    # Mantém * (WhatsApp), apenas normaliza º
-    return str(posto).strip().replace('º', '°').replace('1º', '1°').replace('2º', '2°').replace('3º', '3°')
+
+def normalizar_posto_display(posto: str) -> str:
+    """
+    Mantém * (WhatsApp), apenas normaliza º->° e espaços.
+    """
+    s = str(posto).strip()
+    s = s.replace("º", "°")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
 
 def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
     s = str(nome_coluna).strip()
+
     idx = s.upper().rfind(" PM ")
     if idx != -1:
         return s[idx + 4:].strip()
 
     for pattern, repl in POSTO_PATTERNS:
         s = pattern.sub(repl, s)
+
     return s.strip()
+
 
 def similaridade(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
+
 def encontrar_militar(nome_extraido: str, efetivo_dict: Dict, limiar: float = 0.88) -> Tuple[Optional[str], Optional[Dict]]:
-    """
-    Mantém o comportamento original (exato -> fuzzy),
-    mas como o efetivo é a fonte de display, o nome final sempre virá do EFETIVO_CSC.
-    """
     nome_norm = normalizar_nome(nome_extraido)
-    if not nome_norm:
-        return None, None
 
     if nome_norm in efetivo_dict:
         return nome_norm, efetivo_dict[nome_norm]
@@ -164,72 +191,174 @@ def encontrar_militar(nome_extraido: str, efetivo_dict: Dict, limiar: float = 0.
 
     return None, None
 
-def classificar_status(resp: str) -> Tuple[str, int]:
-    resp_lower = resp.lower()
 
-    if resp_lower == 'presente':
+# =========================
+# EXIBIÇÃO: SOMENTE TOKENS ENTRE *...*
+# =========================
+def extrair_tokens_negrito(texto: str) -> List[str]:
+    """
+    Retorna somente os trechos entre *...*, preservando os asteriscos.
+    """
+    if not texto:
+        return []
+    return [f"*{m.group(1).strip()}*" for m in STAR_TOKEN_PATTERN.finditer(str(texto)) if m.group(1).strip()]
+
+
+def formatar_nome_posto_somente_negritos(dados: Dict) -> str:
+    """
+    Ex.: posto "*TEN CEL*" e nome "*LEONARDO* de *CASTRO* Ferreira"
+      -> "*TEN CEL*, *LEONARDO* *CASTRO*"
+    """
+    posto = str(dados.get("posto_display", "")).strip()
+    nome = str(dados.get("nome_display", "")).strip()
+
+    posto_tokens = extrair_tokens_negrito(posto)
+    nome_tokens = extrair_tokens_negrito(nome)
+
+    posto_out = posto_tokens[0] if posto_tokens else posto
+    nome_out = " ".join(nome_tokens) if nome_tokens else nome
+
+    return f"{posto_out}, {nome_out}".strip()
+
+
+# =========================
+# STATUS / PERÍODOS
+# =========================
+def classificar_status(resp: str) -> Tuple[str, int]:
+    resp_lower = str(resp).strip().lower()
+
+    if resp_lower == "presente":
         return "Presente", 6
-    if resp_lower == 'ausente':
+    if resp_lower == "ausente":
         return "Ausente", 3
-    if resp_lower == 'folga':
+    if resp_lower == "folga":
         return "Folga", 4
-    if 'dispensa' in resp_lower:
+    if "dispensa" in resp_lower:
         return "Dispensa pela Chefia", 5
 
     for keywords, priority in STATUS_KEYWORDS:
         if any(kw in resp_lower for kw in keywords):
-            return resp, priority
+            return str(resp).strip(), priority
 
-    return resp, 50
+    return str(resp).strip(), 50
+
 
 def precisa_periodo(status: str) -> bool:
-    sl = status.lower()
-    return 'férias' in sl or 'ferias' in sl or 'licença' in sl or 'licenca' in sl
+    sl = str(status).lower()
+    return ("férias" in sl or "ferias" in sl or "licença" in sl or "licenca" in sl)
+
 
 def validar_periodo(inicio: date, fim: date) -> bool:
     return fim >= inicio
 
+
 def formatar_periodo(inicio: date, fim: date) -> str:
     return f"{inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
 
+
 def ordem_status(s: str) -> int:
-    sl = s.lower()
+    sl = str(s).lower()
     for keywords, priority in STATUS_KEYWORDS:
         if any(kw in sl for kw in keywords):
             return priority
     return 50
 
+
 # =========================
-# Processamento
+# ORDENAÇÃO HIERÁRQUICA (mais antigo -> mais moderno)
+# =========================
+def limpar_para_ranking(texto: str) -> str:
+    if not texto:
+        return ""
+    s = remover_asteriscos(str(texto)).upper().strip()
+    s = remover_acentos(s)
+    s = s.replace("º", "°")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+RANK_OFICIAIS = {
+    "TEN CEL": 10, "TENENTE CORONEL": 10,
+    "MAJ": 20, "MAJOR": 20,
+    "CAP": 30, "CAPITAO": 30, "CAPITÃO": 30,
+    "1° TEN": 40, "1 TEN": 40, "1 TENENTE": 40, "PRIMEIRO TENENTE": 40,
+    "2° TEN": 50, "2 TEN": 50, "2 TENENTE": 50, "SEGUNDO TENENTE": 50,
+}
+
+RANK_PRACAS = {
+    "SUBTEN": 10, "SUB TEN": 10, "SUBTENENTE": 10,
+    "1° SGT": 20, "1 SGT": 20, "1 SARGENTO": 20,
+    "2° SGT": 30, "2 SGT": 30, "2 SARGENTO": 30,
+    "3° SGT": 40, "3 SGT": 40, "3 SARGENTO": 40,
+    "CB": 50, "CABO": 50,
+    "SD": 60, "SOLDADO": 60,
+}
+
+
+def extrair_chave_posto(posto_display: str) -> str:
+    s = limpar_para_ranking(posto_display)
+    s = s.replace("1°TEN", "1° TEN").replace("2°TEN", "2° TEN").replace("3°TEN", "3° TEN")
+    s = s.replace("1°SGT", "1° SGT").replace("2°SGT", "2° SGT").replace("3°SGT", "3° SGT")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def rank_hierarquico(dados_militar: Dict) -> int:
+    categoria = dados_militar.get("categoria", "")
+    posto_display = dados_militar.get("posto_display", "")
+    chave = extrair_chave_posto(posto_display)
+
+    if categoria == "OFICIAIS":
+        if chave in RANK_OFICIAIS:
+            return RANK_OFICIAIS[chave]
+        for k, v in RANK_OFICIAIS.items():
+            if k in chave:
+                return v
+        return 900
+
+    if categoria == "PRAÇAS":
+        if chave in RANK_PRACAS:
+            return RANK_PRACAS[chave]
+        for k, v in RANK_PRACAS.items():
+            if k in chave:
+                return v
+        return 900
+
+    return 999  # CIVIS / outros
+
+
+# =========================
+# PROCESSAMENTO DE DADOS
 # =========================
 @st.cache_data
 def carregar_efetivo() -> Dict:
     df_efetivo = pd.read_csv(io.StringIO(EFETIVO_CSC))
 
-    for col in ['SEÇÃO', 'NÚMERO', 'P  / G', 'QUADRO', 'NOME']:
+    for col in ["SEÇÃO", "NÚMERO", "P  / G", "QUADRO", "NOME"]:
         df_efetivo[col] = df_efetivo[col].astype(str).str.strip()
 
     efetivo_dict = {}
 
     for _, row in df_efetivo.iterrows():
-        quadro = row['QUADRO'].upper()
+        quadro = row["QUADRO"].upper()
         categoria = QUADRO_CATEGORIA.get(quadro)
         if not categoria:
             continue
 
-        nome_display = row['NOME']  # com * para negrito
-        posto_display = normalizar_posto(row['P  / G'])  # com * para negrito
-        nome_norm = normalizar_nome(nome_display)
+        nome_display = row["NOME"]  # mantém *
+        posto_display = normalizar_posto_display(row["P  / G"])  # mantém *
+        nome_norm = normalizar_nome(nome_display)  # remove * para matching
 
         efetivo_dict[nome_norm] = {
-            'categoria': categoria,
-            'posto_display': posto_display,
-            'nome_display': nome_display,
-            'quadro': quadro,
-            'secao': row['SEÇÃO'].upper()
+            "categoria": categoria,
+            "posto_display": posto_display,   # com *
+            "nome_display": nome_display,     # com *
+            "quadro": quadro,
+            "secao": row["SEÇÃO"].upper().strip(),
         }
 
     return efetivo_dict
+
 
 def processar_respostas(df_hoje: pd.DataFrame, efetivo_dict: Dict) -> Dict:
     respostas_dict = {}
@@ -237,71 +366,89 @@ def processar_respostas(df_hoje: pd.DataFrame, efetivo_dict: Dict) -> Dict:
     colunas_militares = df_hoje.columns[4:]
 
     for _, row in df_hoje.iterrows():
-        secao = str(row['Seção:'])
+        secao = str(row["Seção:"])
         if secao in secoes_processadas:
             continue
         secoes_processadas.add(secao)
 
         for col in colunas_militares:
             valor = row[col]
-            if pd.isna(valor) or str(valor).strip() == '':
+            if pd.isna(valor) or str(valor).strip() == "":
                 continue
 
             nome_militar = extrair_nome_completo_da_coluna(str(col).strip())
             chave_efetivo, militar_encontrado = encontrar_militar(nome_militar, efetivo_dict)
+
             if not militar_encontrado:
                 continue
 
-            respostas = [r.strip() for r in str(valor).strip().split(',') if r.strip()]
+            respostas = [r.strip() for r in str(valor).strip().split(",") if r.strip()]
             candidatos = [classificar_status(resp) for resp in respostas]
 
             if candidatos:
                 status_texto_exato = min(candidatos, key=lambda x: x[1])[0]
                 respostas_dict[chave_efetivo] = {
-                    'status': status_texto_exato,
-                    'dados': militar_encontrado
+                    "status": status_texto_exato,
+                    "dados": militar_encontrado,
                 }
 
     return respostas_dict
 
-def organizar_categorias(efetivo_dict: Dict, respostas_dict: Dict, periodos_inseridos: Dict) -> Tuple[Dict, Dict, List[str]]:
+
+def organizar_categorias(
+    efetivo_dict: Dict,
+    respostas_dict: Dict,
+    periodos_inseridos: Dict
+) -> Tuple[Dict, Dict, List[str]]:
+    """
+    Guarda listas como tuplas (rank, texto) para ordenar hierarquicamente.
+    """
     categorias_dados = {
-        cat: {'presentes': [], 'afastamentos': {}, 'total': 0}
-        for cat in ['OFICIAIS', 'PRAÇAS', 'CIVIS']
+        cat: {"presentes": [], "afastamentos": {}, "total": 0}
+        for cat in ["OFICIAIS", "PRAÇAS", "CIVIS"]
     }
 
     faltantes_por_secao = {}
     militares_nao_informados = []
 
     for nome_norm, dados in efetivo_dict.items():
-        categoria = dados['categoria']
-        categorias_dados[categoria]['total'] += 1
+        categoria = dados["categoria"]
+        categorias_dados[categoria]["total"] += 1
 
         resposta = respostas_dict.get(nome_norm)
-
         if not resposta:
-            secao = dados.get('secao', 'SEM SEÇÃO')
+            secao = dados.get("secao", "SEM SEÇÃO")
             faltantes_por_secao[secao] = faltantes_por_secao.get(secao, 0) + 1
-            militares_nao_informados.append(f"{dados['posto_display']} {dados['nome_display']} ({secao})")
+            militares_nao_informados.append(f"{formatar_nome_posto_somente_negritos(dados)} ({secao})")
             continue
 
-        status = str(resposta['status']).strip()
-        posto_nome_display = f"{dados['posto_display']} {dados['nome_display']}"
+        status = str(resposta["status"]).strip()
 
+        # TEXTO de exibição: SOMENTE os tokens em *
+        posto_nome_display = formatar_nome_posto_somente_negritos(dados)
+        r = rank_hierarquico(dados)
+
+        # período (quando aplicável)
         if precisa_periodo(status) and nome_norm in periodos_inseridos:
             ini, fim = periodos_inseridos[nome_norm]
             posto_nome_saida = f"{posto_nome_display} - {formatar_periodo(ini, fim)}"
         else:
             posto_nome_saida = posto_nome_display
 
-        if 'presente' in status.lower() or status == "Presente":
-            categorias_dados[categoria]['presentes'].append(posto_nome_display)
+        # presente x afastamento
+        if "presente" in status.lower() or status == "Presente":
+            categorias_dados[categoria]["presentes"].append((r, posto_nome_display))
         else:
-            categorias_dados[categoria]['afastamentos'].setdefault(status, []).append(posto_nome_saida)
+            categorias_dados[categoria]["afastamentos"].setdefault(status, []).append((r, posto_nome_saida))
 
     return categorias_dados, faltantes_por_secao, militares_nao_informados
 
-def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_secao: Dict) -> Tuple[str, int, int]:
+
+def gerar_anuncio(
+    data_formatada: str,
+    categorias_dados: Dict,
+    faltantes_por_secao: Dict
+) -> Tuple[str, int, int]:
     anuncio_parts = [
         "Bom dia!",
         "Segue anúncio do dia",
@@ -314,13 +461,14 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
     total_militares = 0
     total_civis = 0
 
-    for categoria in ['OFICIAIS', 'PRAÇAS', 'CIVIS']:
+    for categoria in ["OFICIAIS", "PRAÇAS", "CIVIS"]:
         dados_cat = categorias_dados[categoria]
 
-        if categoria == 'CIVIS':
-            total_civis = len(dados_cat['presentes'])
+        # contagem de presentes
+        if categoria == "CIVIS":
+            total_civis = len(dados_cat["presentes"])
         else:
-            total_militares += len(dados_cat['presentes'])
+            total_militares += len(dados_cat["presentes"])
 
         anuncio_parts.extend([
             f"*{categoria}*",
@@ -329,23 +477,29 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
             ""
         ])
 
-        if dados_cat['presentes']:
-            anuncio_parts.append(f"🔹{len(dados_cat['presentes'])} Presentes:")
-            anuncio_parts.extend(f"    {i}. {nome}" for i, nome in enumerate(dados_cat['presentes'], 1))
+        # Presentes (ordenar por hierarquia)
+        if dados_cat["presentes"]:
+            presentes_ordenados = sorted(dados_cat["presentes"], key=lambda x: (x[0], x[1]))
+            anuncio_parts.append(f"🔹{len(presentes_ordenados)} Presentes:")
+            anuncio_parts.extend(f"    {i}. {txt}" for i, (_, txt) in enumerate(presentes_ordenados, 1))
             anuncio_parts.append("")
 
-        for status in sorted(dados_cat['afastamentos'].keys(), key=ordem_status):
-            lista = dados_cat['afastamentos'][status]
-            anuncio_parts.append(f"🔹{len(lista)} {status}")
-            anuncio_parts.extend(f"    {i}. {info}" for i, info in enumerate(lista, 1))
+        # Afastamentos por status (e por hierarquia dentro de cada status)
+        for status in sorted(dados_cat["afastamentos"].keys(), key=ordem_status):
+            lista = dados_cat["afastamentos"][status]
+            lista_ordenada = sorted(lista, key=lambda x: (x[0], x[1]))
+            anuncio_parts.append(f"🔹{len(lista_ordenada)} {status}")
+            anuncio_parts.extend(f"    {i}. {txt}" for i, (_, txt) in enumerate(lista_ordenada, 1))
             anuncio_parts.append("")
 
-        anuncio_parts.append("")
+        anuncio_parts.append("")  # espaço entre categorias
 
+    # Seções sem resposta (conciso)
     if faltantes_por_secao:
         itens = sorted(faltantes_por_secao.items(), key=lambda x: (-x[1], x[0]))
         anuncio_parts.append(f"❌ Seções sem resposta ({len(itens)}):")
-        anuncio_parts.extend(f"➡️ {secao}({qtd} servidores no total);" for secao, qtd in itens)
+        for secao, qtd in itens:
+            anuncio_parts.append(f"➡️ {secao}({qtd} servidores no total);")
         anuncio_parts.append("")
 
     anuncio_parts.extend([
@@ -360,16 +514,17 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict, faltantes_por_sec
 
     return "\n".join(anuncio_parts), total_militares, total_civis
 
+
 # =========================
-# UI Principal
+# UI PRINCIPAL (STREAMLIT)
 # =========================
 def main():
     init_session_state()
 
-    st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v3.10")
+    st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v4.0")
     st.markdown("---")
 
-    # SIDEBAR: APENAS CONTROLES
+    # Sidebar: somente controles
     with st.sidebar:
         st.subheader("⚙️ Controles")
 
@@ -390,9 +545,7 @@ def main():
             st.success("Cache limpo. Recarregando...")
             st.rerun()
 
-    # =========================
-    # ÁREA PRINCIPAL
-    # =========================
+    # 1) Carregar planilha do formulário
     st.subheader("1) Carregar planilha do formulário")
 
     modo = st.radio(
@@ -404,22 +557,18 @@ def main():
     if modo == "URL Google Sheets (público) - automático":
         sheet_url = st.text_input("URL do Google Sheets (público)", value=st.session_state.last_sheet_url)
 
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            if st.button("Baixar planilha"):
-                try:
-                    xlsx_bytes = baixar_sheets_publico_xlsx(sheet_url)
-                    st.session_state.df_formulario = pd.read_excel(io.BytesIO(xlsx_bytes))
-                    st.session_state.fonte_ok = True
-                    st.session_state.periodos_aplicados = False
-                    st.session_state.periodos_inseridos = {}
-                    st.session_state.last_sheet_url = sheet_url
-                    st.success("✅ Planilha baixada e carregada com sucesso!")
-                except Exception as e:
-                    st.error(f"❌ Erro ao baixar/ler a planilha: {e}")
+        if st.button("Baixar planilha"):
+            try:
+                xlsx_bytes = baixar_sheets_publico_xlsx(sheet_url)
+                st.session_state.df_formulario = pd.read_excel(io.BytesIO(xlsx_bytes))
+                st.session_state.fonte_ok = True
+                st.session_state.periodos_aplicados = False
+                st.session_state.periodos_inseridos = {}
+                st.session_state.last_sheet_url = sheet_url
+                st.success("✅ Planilha baixada e carregada com sucesso!")
+            except Exception as e:
+                st.error(f"❌ Erro ao baixar/ler a planilha: {e}")
 
-        with c2:
-            st.write("")  # espaçador
     else:
         uploaded_file = st.file_uploader("Escolha um arquivo Excel", type=["xls", "xlsx"])
         if uploaded_file is not None:
@@ -434,22 +583,21 @@ def main():
         st.info("Carregue a planilha para continuar.")
         st.stop()
 
+    # 2) Leitura das respostas
     data_atual = datetime.now()
     data_formatada = data_atual.strftime("%d/%m/%Y")
 
     efetivo_dict = carregar_efetivo()
 
-    # Validar colunas obrigatórias
-    colunas_obrigatorias = {'Carimbo de data/hora', 'Data do anúncio', 'Seção:'}
+    colunas_obrigatorias = {"Carimbo de data/hora", "Data do anúncio", "Seção:"}
     faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
     if faltando:
         st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
         st.stop()
 
-    # Filtrar registros de hoje
-    df_formulario['Carimbo de data/hora'] = pd.to_datetime(df_formulario['Carimbo de data/hora'])
-    df_formulario['Data do anúncio'] = pd.to_datetime(df_formulario['Data do anúncio'])
-    df_hoje = df_formulario[df_formulario['Data do anúncio'].dt.date == data_atual.date()].copy()
+    df_formulario["Carimbo de data/hora"] = pd.to_datetime(df_formulario["Carimbo de data/hora"])
+    df_formulario["Data do anúncio"] = pd.to_datetime(df_formulario["Data do anúncio"])
+    df_hoje = df_formulario[df_formulario["Data do anúncio"].dt.date == data_atual.date()].copy()
 
     st.markdown("---")
     st.subheader("2) Leitura das respostas")
@@ -460,29 +608,30 @@ def main():
         st.stop()
 
     st.success(f"✅ Encontrados {len(df_hoje)} registro(s) para {data_formatada}")
-    df_hoje = df_hoje.sort_values('Carimbo de data/hora', ascending=False)
+    df_hoje = df_hoje.sort_values("Carimbo de data/hora", ascending=False)
 
     respostas_dict = processar_respostas(df_hoje, efetivo_dict)
 
-    # Seção 3: Períodos
+    # 3) Períodos (Férias / Licença)
     afastados = [
-        (chave, resp['dados'], resp['status'])
+        (chave, resp["dados"], resp["status"])
         for chave, resp in respostas_dict.items()
-        if precisa_periodo(resp['status'])
+        if precisa_periodo(resp["status"])
     ]
 
     st.markdown("---")
     st.subheader("3) Informar períodos (Férias / Licença)")
+    st.caption("No anúncio: `POSTO, NOMES EM *negrito* - dd/mm/aaaa a dd/mm/aaaa`")
 
     if afastados and not st.session_state.periodos_aplicados:
-        st.write("Preencha início e fim e clique em **Aplicar períodos**. No anúncio será exibido: `POSTO NOME - dd/mm/aaaa a dd/mm/aaaa`")
+        st.write("Preencha início e fim e clique em **Aplicar períodos**.")
 
         with st.form("form_periodos"):
             novos_periodos = {}
             erros = []
 
             for chave_norm, dados, status in afastados:
-                posto_nome_display = f"{dados['posto_display']} {dados['nome_display']}"
+                posto_nome_display = formatar_nome_posto_somente_negritos(dados)
                 st.markdown(f"**{posto_nome_display}**  \n_{status}_")
 
                 ini_padrao, fim_padrao = st.session_state.periodos_memoria.get(
@@ -521,15 +670,16 @@ def main():
 
     periodos_inseridos = st.session_state.periodos_inseridos if st.session_state.periodos_aplicados else {}
 
+    # Organizar e gerar anúncio (com ordem hierárquica)
     categorias_dados, faltantes_por_secao, militares_nao_informados = organizar_categorias(
         efetivo_dict, respostas_dict, periodos_inseridos
     )
 
-    anuncio, total_militares, total_civis = gerar_anuncio(data_formatada, categorias_dados, faltantes_por_secao)
+    anuncio, _, _ = gerar_anuncio(data_formatada, categorias_dados, faltantes_por_secao)
 
     st.markdown("---")
     st.subheader("📢 ANÚNCIO GERADO:")
-    st.code(anuncio, language='text')
+    st.code(anuncio, language="text")
 
     if faltantes_por_secao:
         with st.expander("Ver militares que não responderam (conferência)"):
@@ -538,12 +688,13 @@ def main():
 
     st.download_button(
         label="Baixar Anúncio de Presença",
-        data=anuncio.encode('utf-8'),
+        data=anuncio.encode("utf-8"),
         file_name="anuncio_presenca.txt",
         mime="text/plain"
     )
 
     st.success("✅ PROCESSO CONCLUÍDO!")
+
 
 if __name__ == "__main__":
     main()
