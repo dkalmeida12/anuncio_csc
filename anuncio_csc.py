@@ -10,7 +10,7 @@ from typing import Tuple, Dict, Optional, List
 
 
 # =========================
-# CONFIG: GOOGLE SHEETS (PÚBLICO)
+# CONFIG: GOOGLE SHEETS (PÚBLICO).
 # =========================
 DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/10izQWPLAk3nv46Pl7ShzchReY3SjZdDl9KgboGQMAWg/edit?usp=sharing"
 SHEET_ID_PATTERN = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
