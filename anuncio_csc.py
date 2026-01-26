@@ -35,6 +35,9 @@ def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
 # EFETIVO CSC-PM (INTEGRADO NO CÓDIGO)
 # IMPORTANTE: os * devem ser mantidos (WhatsApp negrito)
 # =========================
+
+# COMPRAS,135.147-7,*2ºTEN*,QOC,*CLEUBER* Ferreira da Silva ======== movimentado para a DAL 06 em 26/01/26
+
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
 CHEFE,126.554-5,*TEN CEL*,QOPM,*LEONARDO* de *CASTRO* Ferreira
 SUBCHEFE,089.655-5,*MAJ*,QOR,Jorge Aparecido *GOMES*
@@ -43,7 +46,6 @@ LICITAÇÃO,100.433-2,*2ºTEN*,QOR,*CLAUDIO* Marcio da Silva
 LICITAÇÃO,087.650-8,*SUBTEN*,QPR,Sérgio Bernardino de *SENA*
 LICITAÇÃO,154.178-8,*2ºSGT*,QPPM,Thiago *LUIZ TEIXEIRA*
 COMPRAS,134.166-8,*CAP*,QOPM,Samuel Luiz *VIEIRA*
-COMPRAS,135.147-7,*2ºTEN*,QOC,*CLEUBER* Ferreira da Silva
 COMPRAS,147.720-7,*3º SGT*,QPE,Herbert Diogo Frade *GARBAZZA*
 P1,166.850-8,*1º TEN*,QOPM,*DIEGO* Kukiyama de *ALMEIDA*
 P1,087.768-8,*1ºSGT*,QPR,*GLAUCO* Almeida Braz
