@@ -10,17 +10,20 @@ from typing import Tuple, Dict, Optional, List
 
 
 # =========================
-# CONFIG: GOOGLE SHEETS (PÚBLICO).
+# CONFIG: GOOGLE SHEETS (PÚBLICO)
 # =========================
 DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/10izQWPLAk3nv46Pl7ShzchReY3SjZdDl9KgboGQMAWg/edit?usp=sharing"
 SHEET_ID_PATTERN = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 
+
 def extrair_sheet_id(url: str) -> str:
+    """Extrai ID da planilha Google Sheets."""
     m = SHEET_ID_PATTERN.search(str(url))
     return m.group(1) if m else ""
 
 
 def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
+    """Baixa planilha pública do Google Sheets."""
     sheet_id = extrair_sheet_id(sheet_url)
     if not sheet_id:
         raise ValueError("Não foi possível extrair o ID da planilha a partir da URL informada.")
@@ -29,53 +32,11 @@ def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
     r.raise_for_status()
     return r.content
 
-   df_formulario = st.session_state.df_formulario
-    if not st.session_state.fonte_ok or df_formulario is None:
-        st.info("Carregue a planilha para continuar.")
-        st.stop()
-
-    # 2) Leitura das respostas
-    data_atual = datetime.now()
-    data_formatada = data_atual.strftime("%d/%m/%Y")
-
-    efetivo_dict = carregar_efetivo()
-
-    colunas_obrigatorias = {"Carimbo de data/hora", "Data do anúncio", "Seção:"}
-    faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
-    if faltando:
-        st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
-        st.stop()
-
-   def to_datetime_safe(series: pd.Series) -> pd.Series:
-    """
-    Converte datas de forma segura:
-    - aceita strings e números (Excel)
-    - valores inválidos viram NaT (não quebram o app)
-    """
-    s = series.copy()
-
-    # Se vier número do Excel (dias desde 1899-12-30), tenta converter assim.
-    # Se vier string normal, a conversão abaixo também funciona.
-    s_num = pd.to_numeric(s, errors="coerce")
-    s_dt_excel = pd.to_datetime(s_num, unit="D", origin="1899-12-30", errors="coerce")
-
-    # Converte também como string (caso padrão)
-    s_dt_str = pd.to_datetime(s, errors="coerce", dayfirst=True)
-
-    # Prioriza o que deu certo (excel > string)
-    out = s_dt_excel.combine_first(s_dt_str)
-
-    return out
-
-
-# Conversão segura
-df_formulario["Carimbo de data/hora"] = to_datetime_safe(df_formulario["Carimbo de data/ho]()
 
 # =========================
 # EFETIVO CSC-PM (INTEGRADO NO CÓDIGO)
 # IMPORTANTE: os * devem ser mantidos (WhatsApp negrito)
 # =========================
-
 # COMPRAS,135.147-7,*2ºTEN*,QOC,*CLEUBER* Ferreira da Silva ======== movimentado para a DAL 06 em 26/01/26
 
 EFETIVO_CSC = """SEÇÃO,NÚMERO,P  / G,QUADRO,NOME
@@ -141,11 +102,30 @@ POSTO_PATTERNS = [
     (re.compile(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', re.IGNORECASE), ''),
 ]
 
+# Ranking hierárquico (mais antigo -> mais moderno)
+RANK_OFICIAIS = {
+    "TEN CEL": 10, "TENENTE CORONEL": 10,
+    "MAJ": 20, "MAJOR": 20,
+    "CAP": 30, "CAPITAO": 30, "CAPITÃO": 30,
+    "1° TEN": 40, "1 TEN": 40, "1 TENENTE": 40, "PRIMEIRO TENENTE": 40,
+    "2° TEN": 50, "2 TEN": 50, "2 TENENTE": 50, "SEGUNDO TENENTE": 50,
+}
+
+RANK_PRACAS = {
+    "SUBTEN": 10, "SUB TEN": 10, "SUBTENENTE": 10,
+    "1° SGT": 20, "1 SGT": 20, "1 SARGENTO": 20,
+    "2° SGT": 30, "2 SGT": 30, "2 SARGENTO": 30,
+    "3° SGT": 40, "3 SGT": 40, "3 SARGENTO": 40,
+    "CB": 50, "CABO": 50,
+    "SD": 60, "SOLDADO": 60,
+}
+
 
 # =========================
 # SESSION STATE
 # =========================
 def init_session_state():
+    """Inicializa variáveis do session state."""
     defaults = {
         "df_formulario": None,
         "fonte_ok": False,
@@ -163,10 +143,12 @@ def init_session_state():
 # AUXILIARES (normalização / matching)
 # =========================
 def remover_asteriscos(s: str) -> str:
+    """Remove asteriscos de uma string."""
     return s.replace("*", "") if s else ""
 
 
 def remover_acentos(s: str) -> str:
+    """Remove acentos de uma string."""
     return "".join(ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch))
 
 
@@ -198,6 +180,7 @@ def normalizar_posto_display(posto: str) -> str:
 
 
 def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
+    """Extrai nome completo do militar do cabeçalho da coluna."""
     s = str(nome_coluna).strip()
 
     idx = s.upper().rfind(" PM ")
@@ -211,10 +194,12 @@ def extrair_nome_completo_da_coluna(nome_coluna: str) -> str:
 
 
 def similaridade(a: str, b: str) -> float:
+    """Calcula similaridade entre duas strings."""
     return SequenceMatcher(None, a, b).ratio()
 
 
 def encontrar_militar(nome_extraido: str, efetivo_dict: Dict, limiar: float = 0.88) -> Tuple[Optional[str], Optional[Dict]]:
+    """Encontra militar no dicionário usando matching exato ou por similaridade."""
     nome_norm = normalizar_nome(nome_extraido)
 
     if nome_norm in efetivo_dict:
@@ -240,6 +225,7 @@ def encontrar_militar(nome_extraido: str, efetivo_dict: Dict, limiar: float = 0.
 def extrair_tokens_negrito(texto: str) -> List[str]:
     """
     Retorna somente os trechos entre *...*, preservando os asteriscos.
+    Ex: "*LEONARDO* de *CASTRO*" -> ["*LEONARDO*", "*CASTRO*"]
     """
     if not texto:
         return []
@@ -267,6 +253,7 @@ def formatar_nome_posto_somente_negritos(dados: Dict) -> str:
 # STATUS / PERÍODOS
 # =========================
 def classificar_status(resp: str) -> Tuple[str, int]:
+    """Classifica status da resposta e retorna prioridade."""
     resp_lower = str(resp).strip().lower()
 
     if resp_lower == "presente":
@@ -286,19 +273,23 @@ def classificar_status(resp: str) -> Tuple[str, int]:
 
 
 def precisa_periodo(status: str) -> bool:
+    """Verifica se o status requer informação de período."""
     sl = str(status).lower()
     return ("férias" in sl or "ferias" in sl or "licença" in sl or "licenca" in sl)
 
 
 def validar_periodo(inicio: date, fim: date) -> bool:
+    """Valida se o período é consistente."""
     return fim >= inicio
 
 
 def formatar_periodo(inicio: date, fim: date) -> str:
+    """Formata período para exibição."""
     return f"{inicio.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}"
 
 
 def ordem_status(s: str) -> int:
+    """Retorna ordem de prioridade para ordenação de status."""
     sl = str(s).lower()
     for keywords, priority in STATUS_KEYWORDS:
         if any(kw in sl for kw in keywords):
@@ -307,9 +298,10 @@ def ordem_status(s: str) -> int:
 
 
 # =========================
-# ORDENAÇÃO HIERÁRQUICA (mais antigo -> mais moderno)
+# ORDENAÇÃO HIERÁRQUICA
 # =========================
 def limpar_para_ranking(texto: str) -> str:
+    """Normaliza texto para comparação de ranking."""
     if not texto:
         return ""
     s = remover_asteriscos(str(texto)).upper().strip()
@@ -319,25 +311,8 @@ def limpar_para_ranking(texto: str) -> str:
     return s
 
 
-RANK_OFICIAIS = {
-    "TEN CEL": 10, "TENENTE CORONEL": 10,
-    "MAJ": 20, "MAJOR": 20,
-    "CAP": 30, "CAPITAO": 30, "CAPITÃO": 30,
-    "1° TEN": 40, "1 TEN": 40, "1 TENENTE": 40, "PRIMEIRO TENENTE": 40,
-    "2° TEN": 50, "2 TEN": 50, "2 TENENTE": 50, "SEGUNDO TENENTE": 50,
-}
-
-RANK_PRACAS = {
-    "SUBTEN": 10, "SUB TEN": 10, "SUBTENENTE": 10,
-    "1° SGT": 20, "1 SGT": 20, "1 SARGENTO": 20,
-    "2° SGT": 30, "2 SGT": 30, "2 SARGENTO": 30,
-    "3° SGT": 40, "3 SGT": 40, "3 SARGENTO": 40,
-    "CB": 50, "CABO": 50,
-    "SD": 60, "SOLDADO": 60,
-}
-
-
 def extrair_chave_posto(posto_display: str) -> str:
+    """Extrai chave do posto para ranking."""
     s = limpar_para_ranking(posto_display)
     s = s.replace("1°TEN", "1° TEN").replace("2°TEN", "2° TEN").replace("3°TEN", "3° TEN")
     s = s.replace("1°SGT", "1° SGT").replace("2°SGT", "2° SGT").replace("3°SGT", "3° SGT")
@@ -346,6 +321,7 @@ def extrair_chave_posto(posto_display: str) -> str:
 
 
 def rank_hierarquico(dados_militar: Dict) -> int:
+    """Retorna rank hierárquico do militar (menor = mais antigo)."""
     categoria = dados_militar.get("categoria", "")
     posto_display = dados_militar.get("posto_display", "")
     chave = extrair_chave_posto(posto_display)
@@ -370,10 +346,35 @@ def rank_hierarquico(dados_militar: Dict) -> int:
 
 
 # =========================
+# CONVERSÃO SEGURA DE DATAS
+# =========================
+def to_datetime_safe(series: pd.Series) -> pd.Series:
+    """
+    Converte datas de forma segura:
+    - aceita strings e números (Excel)
+    - valores inválidos viram NaT (não quebram o app)
+    """
+    s = series.copy()
+
+    # Se vier número do Excel (dias desde 1899-12-30), tenta converter
+    s_num = pd.to_numeric(s, errors="coerce")
+    s_dt_excel = pd.to_datetime(s_num, unit="D", origin="1899-12-30", errors="coerce")
+
+    # Converte também como string (caso padrão)
+    s_dt_str = pd.to_datetime(s, errors="coerce", dayfirst=True)
+
+    # Prioriza o que deu certo (excel > string)
+    out = s_dt_excel.combine_first(s_dt_str)
+
+    return out
+
+
+# =========================
 # PROCESSAMENTO DE DADOS
 # =========================
 @st.cache_data
 def carregar_efetivo() -> Dict:
+    """Carrega e processa dados do efetivo (cached)."""
     df_efetivo = pd.read_csv(io.StringIO(EFETIVO_CSC))
 
     for col in ["SEÇÃO", "NÚMERO", "P  / G", "QUADRO", "NOME"]:
@@ -387,14 +388,14 @@ def carregar_efetivo() -> Dict:
         if not categoria:
             continue
 
-        nome_display = row["NOME"]  # mantém *
-        posto_display = normalizar_posto_display(row["P  / G"])  # mantém *
-        nome_norm = normalizar_nome(nome_display)  # remove * para matching
+        nome_display = row["NOME"]
+        posto_display = normalizar_posto_display(row["P  / G"])
+        nome_norm = normalizar_nome(nome_display)
 
         efetivo_dict[nome_norm] = {
             "categoria": categoria,
-            "posto_display": posto_display,   # com *
-            "nome_display": nome_display,     # com *
+            "posto_display": posto_display,
+            "nome_display": nome_display,
             "quadro": quadro,
             "secao": row["SEÇÃO"].upper().strip(),
         }
@@ -403,6 +404,7 @@ def carregar_efetivo() -> Dict:
 
 
 def processar_respostas(df_hoje: pd.DataFrame, efetivo_dict: Dict) -> Dict:
+    """Processa respostas do formulário e retorna dicionário de status."""
     respostas_dict = {}
     secoes_processadas = set()
     colunas_militares = df_hoje.columns[4:]
@@ -443,7 +445,8 @@ def organizar_categorias(
     periodos_inseridos: Dict
 ) -> Tuple[Dict, Dict, List[str]]:
     """
-    Guarda listas como tuplas (rank, texto) para ordenar hierarquicamente.
+    Organiza dados por categoria com ordenação hierárquica.
+    Guarda listas como tuplas (rank, texto) para ordenar depois.
     """
     categorias_dados = {
         cat: {"presentes": [], "afastamentos": {}, "total": 0}
@@ -491,6 +494,7 @@ def gerar_anuncio(
     categorias_dados: Dict,
     faltantes_por_secao: Dict
 ) -> Tuple[str, int, int]:
+    """Gera texto do anúncio de presença com ordenação hierárquica."""
     anuncio_parts = [
         "Bom dia!",
         "Segue anúncio do dia",
@@ -506,7 +510,6 @@ def gerar_anuncio(
     for categoria in ["OFICIAIS", "PRAÇAS", "CIVIS"]:
         dados_cat = categorias_dados[categoria]
 
-        # contagem de presentes
         if categoria == "CIVIS":
             total_civis = len(dados_cat["presentes"])
         else:
@@ -534,9 +537,9 @@ def gerar_anuncio(
             anuncio_parts.extend(f"    {i}. {txt}" for i, (_, txt) in enumerate(lista_ordenada, 1))
             anuncio_parts.append("")
 
-        anuncio_parts.append("")  # espaço entre categorias
+        anuncio_parts.append("")
 
-    # Seções sem resposta (conciso)
+    # Seções sem resposta
     if faltantes_por_secao:
         itens = sorted(faltantes_por_secao.items(), key=lambda x: (-x[1], x[0]))
         anuncio_parts.append(f"❌ Seções sem resposta ({len(itens)}):")
@@ -561,34 +564,38 @@ def gerar_anuncio(
 # UI PRINCIPAL (STREAMLIT)
 # =========================
 def main():
+    """Função principal do aplicativo."""
     init_session_state()
 
     st.title("GERADOR DE ANÚNCIO DE PRESENÇA CSC-PM v4.0")
     st.markdown("---")
 
-    # Sidebar: somente controles
+    # Sidebar: controles
     with st.sidebar:
         st.subheader("⚙️ Controles")
 
-        if st.button("Limpar carregamento (reset)"):
+        if st.button("🔄 Limpar carregamento (reset)"):
             st.session_state.df_formulario = None
             st.session_state.fonte_ok = False
             st.session_state.periodos_aplicados = False
             st.session_state.periodos_inseridos = {}
             st.rerun()
 
-        if st.button("Limpar memória de períodos"):
+        if st.button("🗑️ Limpar memória de períodos"):
             st.session_state.periodos_memoria = {}
             st.success("Memória de períodos limpa.")
             st.rerun()
 
-        if st.button("Limpar cache (efetivo / normalização)"):
+        if st.button("⚡ Limpar cache (efetivo / normalização)"):
             st.cache_data.clear()
             st.success("Cache limpo. Recarregando...")
             st.rerun()
 
+        st.markdown("---")
+        st.caption("v4.0 - Melhorias: ordenação hierárquica, exibição otimizada, conversão de datas robusta")
+
     # 1) Carregar planilha do formulário
-    st.subheader("1) Carregar planilha do formulário")
+    st.subheader("1️⃣ Carregar planilha do formulário")
 
     modo = st.radio(
         "Como deseja carregar a planilha do formulário?",
@@ -599,14 +606,15 @@ def main():
     if modo == "URL Google Sheets (público) - automático":
         sheet_url = st.text_input("URL do Google Sheets (público)", value=st.session_state.last_sheet_url)
 
-        if st.button("Baixar planilha"):
+        if st.button("📥 Baixar planilha"):
             try:
-                xlsx_bytes = baixar_sheets_publico_xlsx(sheet_url)
-                st.session_state.df_formulario = pd.read_excel(io.BytesIO(xlsx_bytes))
-                st.session_state.fonte_ok = True
-                st.session_state.periodos_aplicados = False
-                st.session_state.periodos_inseridos = {}
-                st.session_state.last_sheet_url = sheet_url
+                with st.spinner("Baixando planilha..."):
+                    xlsx_bytes = baixar_sheets_publico_xlsx(sheet_url)
+                    st.session_state.df_formulario = pd.read_excel(io.BytesIO(xlsx_bytes))
+                    st.session_state.fonte_ok = True
+                    st.session_state.periodos_aplicados = False
+                    st.session_state.periodos_inseridos = {}
+                    st.session_state.last_sheet_url = sheet_url
                 st.success("✅ Planilha baixada e carregada com sucesso!")
             except Exception as e:
                 st.error(f"❌ Erro ao baixar/ler a planilha: {e}")
@@ -614,22 +622,42 @@ def main():
     else:
         uploaded_file = st.file_uploader("Escolha um arquivo Excel", type=["xls", "xlsx"])
         if uploaded_file is not None:
-            st.session_state.df_formulario = pd.read_excel(uploaded_file)
-            st.session_state.fonte_ok = True
-            st.session_state.periodos_aplicados = False
-            st.session_state.periodos_inseridos = {}
-            st.success("✅ Planilha carregada via upload!")
+            try:
+                st.session_state.df_formulario = pd.read_excel(uploaded_file)
+                st.session_state.fonte_ok = True
+                st.session_state.periodos_aplicados = False
+                st.session_state.periodos_inseridos = {}
+                st.success("✅ Planilha carregada via upload!")
+            except Exception as e:
+                st.error(f"❌ Erro ao ler a planilha: {e}")
 
-# PONTO INICIAL
-    
- 
+    df_formulario = st.session_state.df_formulario
+    if not st.session_state.fonte_ok or df_formulario is None:
+        st.info("📌 Carregue a planilha para continuar.")
+        st.stop()
 
-# PONTO FINAL
-                                                         
+    # 2) Leitura das respostas
+    data_atual = datetime.now()
+    data_formatada = data_atual.strftime("%d/%m/%Y")
+
+    efetivo_dict = carregar_efetivo()
+
+    # Validar colunas obrigatórias
+    colunas_obrigatorias = {"Carimbo de data/hora", "Data do anúncio", "Seção:"}
+    faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
+    if faltando:
+        st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
+        st.stop()
+
+    # Conversão segura de datas
+    df_formulario["Carimbo de data/hora"] = to_datetime_safe(df_formulario["Carimbo de data/hora"])
+    df_formulario["Data do anúncio"] = to_datetime_safe(df_formulario["Data do anúncio"])
+
+    # Filtrar registros de hoje
     df_hoje = df_formulario[df_formulario["Data do anúncio"].dt.date == data_atual.date()].copy()
 
     st.markdown("---")
-    st.subheader("2) Leitura das respostas")
+    st.subheader("2️⃣ Leitura das respostas")
 
     if df_hoje.empty:
         st.warning(f"⚠️ ATENÇÃO: Não há registros para a data {data_formatada}")
@@ -649,7 +677,7 @@ def main():
     ]
 
     st.markdown("---")
-    st.subheader("3) Informar períodos (Férias / Licença)")
+    st.subheader("3️⃣ Informar períodos (Férias / Licença)")
     st.caption("No anúncio: `POSTO, NOMES EM *negrito* - dd/mm/aaaa a dd/mm/aaaa`")
 
     if afastados and not st.session_state.periodos_aplicados:
@@ -679,7 +707,7 @@ def main():
                 novos_periodos[chave_norm] = (inicio, fim)
                 st.markdown("---")
 
-            submitted = st.form_submit_button("Aplicar períodos")
+            submitted = st.form_submit_button("✅ Aplicar períodos")
 
         if submitted:
             if erros:
@@ -711,14 +739,14 @@ def main():
     st.code(anuncio, language="text")
 
     if faltantes_por_secao:
-        with st.expander("Ver militares que não responderam (conferência)"):
+        with st.expander("👥 Ver militares que não responderam (conferência)"):
             for item in sorted(militares_nao_informados):
                 st.write(f"• {item}")
 
     st.download_button(
-        label="Baixar Anúncio de Presença",
+        label="💾 Baixar Anúncio de Presença",
         data=anuncio.encode("utf-8"),
-        file_name="anuncio_presenca.txt",
+        file_name=f"anuncio_presenca_{data_atual.strftime('%Y%m%d')}.txt",
         mime="text/plain"
     )
 
