@@ -15,7 +15,6 @@ from typing import Tuple, Dict, Optional, List
 DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/10izQWPLAk3nv46Pl7ShzchReY3SjZdDl9KgboGQMAWg/edit?usp=sharing"
 SHEET_ID_PATTERN = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 
-
 def extrair_sheet_id(url: str) -> str:
     m = SHEET_ID_PATTERN.search(str(url))
     return m.group(1) if m else ""
@@ -30,6 +29,47 @@ def baixar_sheets_publico_xlsx(sheet_url: str) -> bytes:
     r.raise_for_status()
     return r.content
 
+   df_formulario = st.session_state.df_formulario
+    if not st.session_state.fonte_ok or df_formulario is None:
+        st.info("Carregue a planilha para continuar.")
+        st.stop()
+
+    # 2) Leitura das respostas
+    data_atual = datetime.now()
+    data_formatada = data_atual.strftime("%d/%m/%Y")
+
+    efetivo_dict = carregar_efetivo()
+
+    colunas_obrigatorias = {"Carimbo de data/hora", "Data do anúncio", "Seção:"}
+    faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
+    if faltando:
+        st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
+        st.stop()
+
+   def to_datetime_safe(series: pd.Series) -> pd.Series:
+    """
+    Converte datas de forma segura:
+    - aceita strings e números (Excel)
+    - valores inválidos viram NaT (não quebram o app)
+    """
+    s = series.copy()
+
+    # Se vier número do Excel (dias desde 1899-12-30), tenta converter assim.
+    # Se vier string normal, a conversão abaixo também funciona.
+    s_num = pd.to_numeric(s, errors="coerce")
+    s_dt_excel = pd.to_datetime(s_num, unit="D", origin="1899-12-30", errors="coerce")
+
+    # Converte também como string (caso padrão)
+    s_dt_str = pd.to_datetime(s, errors="coerce", dayfirst=True)
+
+    # Prioriza o que deu certo (excel > string)
+    out = s_dt_excel.combine_first(s_dt_str)
+
+    return out
+
+
+# Conversão segura
+df_formulario["Carimbo de data/hora"] = to_datetime_safe(df_formulario["Carimbo de data/ho]()
 
 # =========================
 # EFETIVO CSC-PM (INTEGRADO NO CÓDIGO)
@@ -582,47 +622,7 @@ def main():
 
 # PONTO INICIAL
     
-    df_formulario = st.session_state.df_formulario
-    if not st.session_state.fonte_ok or df_formulario is None:
-        st.info("Carregue a planilha para continuar.")
-        st.stop()
-
-    # 2) Leitura das respostas
-    data_atual = datetime.now()
-    data_formatada = data_atual.strftime("%d/%m/%Y")
-
-    efetivo_dict = carregar_efetivo()
-
-    colunas_obrigatorias = {"Carimbo de data/hora", "Data do anúncio", "Seção:"}
-    faltando = colunas_obrigatorias - set(df_formulario.columns.astype(str))
-    if faltando:
-        st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
-        st.stop()
-
-   def to_datetime_safe(series: pd.Series) -> pd.Series:
-    """
-    Converte datas de forma segura:
-    - aceita strings e números (Excel)
-    - valores inválidos viram NaT (não quebram o app)
-    """
-    s = series.copy()
-
-    # Se vier número do Excel (dias desde 1899-12-30), tenta converter assim.
-    # Se vier string normal, a conversão abaixo também funciona.
-    s_num = pd.to_numeric(s, errors="coerce")
-    s_dt_excel = pd.to_datetime(s_num, unit="D", origin="1899-12-30", errors="coerce")
-
-    # Converte também como string (caso padrão)
-    s_dt_str = pd.to_datetime(s, errors="coerce", dayfirst=True)
-
-    # Prioriza o que deu certo (excel > string)
-    out = s_dt_excel.combine_first(s_dt_str)
-
-    return out
-
-
-# Conversão segura
-df_formulario["Carimbo de data/hora"] = to_datetime_safe(df_formulario["Carimbo de data/ho]()
+ 
 
 # PONTO FINAL
                                                          
