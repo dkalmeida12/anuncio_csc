@@ -580,6 +580,8 @@ def main():
             st.session_state.periodos_inseridos = {}
             st.success("✅ Planilha carregada via upload!")
 
+# PONTO INICIAL
+    
     df_formulario = st.session_state.df_formulario
     if not st.session_state.fonte_ok or df_formulario is None:
         st.info("Carregue a planilha para continuar.")
@@ -597,8 +599,33 @@ def main():
         st.error(f"❌ A planilha não possui as colunas obrigatórias: {', '.join(sorted(faltando))}")
         st.stop()
 
-    df_formulario["Carimbo de data/hora"] = pd.to_datetime(df_formulario["Carimbo de data/hora"])
-    df_formulario["Data do anúncio"] = pd.to_datetime(df_formulario["Data do anúncio"])
+   def to_datetime_safe(series: pd.Series) -> pd.Series:
+    """
+    Converte datas de forma segura:
+    - aceita strings e números (Excel)
+    - valores inválidos viram NaT (não quebram o app)
+    """
+    s = series.copy()
+
+    # Se vier número do Excel (dias desde 1899-12-30), tenta converter assim.
+    # Se vier string normal, a conversão abaixo também funciona.
+    s_num = pd.to_numeric(s, errors="coerce")
+    s_dt_excel = pd.to_datetime(s_num, unit="D", origin="1899-12-30", errors="coerce")
+
+    # Converte também como string (caso padrão)
+    s_dt_str = pd.to_datetime(s, errors="coerce", dayfirst=True)
+
+    # Prioriza o que deu certo (excel > string)
+    out = s_dt_excel.combine_first(s_dt_str)
+
+    return out
+
+
+# Conversão segura
+df_formulario["Carimbo de data/hora"] = to_datetime_safe(df_formulario["Carimbo de data/ho]()
+
+# PONTO FINAL
+                                                         
     df_hoje = df_formulario[df_formulario["Data do anúncio"].dt.date == data_atual.date()].copy()
 
     st.markdown("---")
