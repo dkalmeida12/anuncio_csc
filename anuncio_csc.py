@@ -496,7 +496,7 @@ def gerar_anuncio(
 ) -> Tuple[str, int, int]:
     """Gera texto do anúncio de presença com ordenação hierárquica."""
     anuncio_parts = [
-        "Bom dia!",
+        "Sr. Bom dia!",
         "Segue anúncio do dia",
         "",
         "Anúncio CSC-PM",
