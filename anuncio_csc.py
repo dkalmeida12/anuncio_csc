@@ -78,7 +78,8 @@ S MANUTENÇÃO,127.860-5,*3ºSGT*,QPPM,Wagner *VITOR* dos Santos
 # CONSTANTES
 # =========================
 QUADRO_CATEGORIA = {
-    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS", "QPEP": "OFICIAIS",
+    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS",
+    "QPEP": "OFICIAIS",   # ← ADICIONAR ESTA LINHA
     "QPR": "PRAÇAS", "QPPM": "PRAÇAS", "QPE": "PRAÇAS",
     "CIVIL": "CIVIS"
 }
@@ -98,6 +99,7 @@ STAR_TOKEN_PATTERN = re.compile(r"\*([^*]+)\*")
 # Padrões para extrair nome do cabeçalho do formulário
 POSTO_PATTERNS = [
     (re.compile(r'^[\s]*ASPM[\s]+', re.IGNORECASE), ''),
+    (re.compile(r'^[\s]*Asp[\s]+a[\s]+Of[\s]+', re.IGNORECASE), ''),   # ← ADICIONAR
     (re.compile(r'^[\s]*\d+[º°][\s]*', re.IGNORECASE), ''),
     (re.compile(r'^[\s]*(TEN[\s]*CEL|MAJ|CAP|SUB[\s]*TENENTE|SUBTENENTE|TEN|SGT|CB)[\s]+', re.IGNORECASE), ''),
     (re.compile(r'^[\s]*\d+[º°]?(TEN|SGT)[\s]+', re.IGNORECASE), ''),
@@ -108,9 +110,9 @@ RANK_OFICIAIS = {
     "TEN CEL": 10, "TENENTE CORONEL": 10,
     "MAJ": 20, "MAJOR": 20,
     "CAP": 30, "CAPITAO": 30, "CAPITÃO": 30,
-    "1° TEN": 40, "1 TEN": 40, "1 TENENTE": 40, "PRIMEIRO TENENTE": 40,
-    "2° TEN": 50, "2 TEN": 50, "2 TENENTE": 50, "SEGUNDO TENENTE": 50,
-    "Asp a Of": 60, "Asp a Of": 60, "Asp a OF": 60, "ASP a Of": 60,
+    "1° TEN": 40, "1 TEN": 40, "PRIMEIRO TENENTE": 40,
+    "2° TEN": 50, "2 TEN": 50, "SEGUNDO TENENTE": 50,
+    "ASP A OF": 60, "ASP": 60,   # ← SUBSTITUIR AS LINHAS DUPLICADAS POR ESTA
 }
 
 RANK_PRACAS = {
