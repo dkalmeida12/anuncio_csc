@@ -78,7 +78,7 @@ S MANUTENÇÃO,127.860-5,*3ºSGT*,QPPM,Wagner *VITOR* dos Santos
 # CONSTANTES
 # =========================
 QUADRO_CATEGORIA = {
-    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS", "QPEP": "OFICIAIS"
+    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS", "QPEP": "OFICIAIS",
     "QPR": "PRAÇAS", "QPPM": "PRAÇAS", "QPE": "PRAÇAS",
     "CIVIL": "CIVIS"
 }
