@@ -47,6 +47,7 @@ LICITAÇÃO,100.433-2,*2ºTEN*,QOR,*CLAUDIO* Marcio da Silva
 LICITAÇÃO,087.650-8,*SUBTEN*,QPR,Sérgio Bernardino de *SENA*
 LICITAÇÃO,154.178-8,*2ºSGT*,QPPM,Thiago *LUIZ TEIXEIRA*
 COMPRAS,134.166-8,*CAP*,QOPM,Samuel Luiz *VIEIRA*
+COMPRAS,142.483-7,*Asp a Of*,QPEP, *VALTER* Martins da Silva
 COMPRAS,147.720-7,*3º SGT*,QPE,Herbert Diogo Frade *GARBAZZA*
 P1,166.850-8,*1º TEN*,QOPM,*DIEGO* Kukiyama de *ALMEIDA*
 P1,087.768-8,*1ºSGT*,QPR,*GLAUCO* Almeida Braz
