@@ -78,7 +78,7 @@ S MANUTENÇÃO,127.860-5,*3ºSGT*,QPPM,Wagner *VITOR* dos Santos
 # CONSTANTES
 # =========================
 QUADRO_CATEGORIA = {
-    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS",
+    "QOPM": "OFICIAIS", "QOR": "OFICIAIS", "QOC": "OFICIAIS", "QPEP": "OFICIAIS"
     "QPR": "PRAÇAS", "QPPM": "PRAÇAS", "QPE": "PRAÇAS",
     "CIVIL": "CIVIS"
 }
@@ -110,6 +110,7 @@ RANK_OFICIAIS = {
     "CAP": 30, "CAPITAO": 30, "CAPITÃO": 30,
     "1° TEN": 40, "1 TEN": 40, "1 TENENTE": 40, "PRIMEIRO TENENTE": 40,
     "2° TEN": 50, "2 TEN": 50, "2 TENENTE": 50, "SEGUNDO TENENTE": 50,
+    "Asp a Of": 60, "Asp a Of": 60, "Asp a OF": 60, "ASP a Of": 60,
 }
 
 RANK_PRACAS = {
