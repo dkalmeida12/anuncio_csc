@@ -69,6 +69,13 @@ RANK_PRACAS = {
     "SD": 60,      "SOLDADO": 60,
 }
 
+# Quadros da ativa = 0 (aparecem primeiro); reconvocados (QOR/QPR) = 1 (aparecem depois)
+QUADRO_RANK = {
+    "QOPM": 0, "QOC": 0, "QPPM": 0, "QPE": 0, "QPEP": 0,
+    "QOR":  1, "QPR":  1,
+    "CIVIL": 0,
+}
+
 
 # =========================
 # SESSION STATE
@@ -254,20 +261,33 @@ def limpar_para_ranking(texto: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def rank_hierarquico(dados: Dict) -> int:
-    categoria = dados.get("categoria", "")
-    chave     = limpar_para_ranking(dados.get("posto_display", ""))
-    chave     = re.sub(r"(\d+)°(TEN|SGT)", r"\1° \2", chave)
+def rank_hierarquico(dados: Dict) -> Tuple[int, int]:
+    """Retorna (posto_rank, quadro_rank) para ordenação hierárquica.
+
+    O posto_rank é o principal (Ten Cel < Maj < Cap ...).
+    O quadro_rank é secundário: ativos (QOPM/QOC/QPPM/QPE/QPEP) = 0,
+    reconvocados (QOR/QPR) = 1, de forma que apareçam APÓS os ativos
+    de mesmo posto/graduação.
+    """
+    categoria  = dados.get("categoria", "")
+    chave      = limpar_para_ranking(dados.get("posto_display", ""))
+    chave      = re.sub(r"(\d+)°(TEN|SGT)", r"\1° \2", chave)
+    quadro     = str(dados.get("quadro", "")).strip().upper()
 
     tabela = RANK_OFICIAIS if categoria == "OFICIAIS" else (
              RANK_PRACAS   if categoria == "PRAÇAS"   else {})
 
     if chave in tabela:
-        return tabela[chave]
-    for k, v in tabela.items():
-        if k in chave:
-            return v
-    return 999 if categoria == "CIVIS" else 900
+        posto_rank = tabela[chave]
+    else:
+        posto_rank = 999 if categoria == "CIVIS" else 900
+        for k, v in tabela.items():
+            if k in chave:
+                posto_rank = v
+                break
+
+    quadro_rank = QUADRO_RANK.get(quadro, 0)
+    return posto_rank, quadro_rank
 
 
 # =========================
@@ -394,9 +414,9 @@ def organizar_categorias(
             )
             continue
 
-        status    = str(resposta["status"]).strip()
-        disp_base = formatar_nome_posto_somente_negritos(dados)
-        rank      = rank_hierarquico(dados)
+        status           = str(resposta["status"]).strip()
+        disp_base        = formatar_nome_posto_somente_negritos(dados)
+        posto_rank, quadro_rank = rank_hierarquico(dados)
 
         if precisa_periodo(status) and nome_norm in periodos_inseridos:
             ini, fim = periodos_inseridos[nome_norm]
@@ -405,10 +425,10 @@ def organizar_categorias(
             disp = disp_base
 
         if "presente" in status.lower():
-            categorias_dados[categoria]["presentes"].append((rank, disp_base))
+            categorias_dados[categoria]["presentes"].append((posto_rank, quadro_rank, disp_base))
         else:
             categorias_dados[categoria]["afastamentos"].setdefault(status, []).append(
-                (rank, disp)
+                (posto_rank, quadro_rank, disp)
             )
 
     return categorias_dados, faltantes_por_secao, militares_nao_informados
@@ -432,15 +452,15 @@ def gerar_anuncio(
         partes += [f"*{categoria}*", "Efetivo total: ", f"🔸{d['total']} - CSC-PM", ""]
 
         if d["presentes"]:
-            presentes = sorted(d["presentes"], key=lambda x: (x[0], x[1]))
+            presentes = sorted(d["presentes"], key=lambda x: (x[0], x[1], x[2]))
             partes.append(f"🔹{len(presentes)} Presentes:")
-            partes += [f"    {i}. {t}" for i, (_, t) in enumerate(presentes, 1)]
+            partes += [f"    {i}. {t}" for i, (_, _, t) in enumerate(presentes, 1)]
             partes.append("")
 
         for status in sorted(d["afastamentos"], key=ordem_status):
-            lista = sorted(d["afastamentos"][status], key=lambda x: (x[0], x[1]))
+            lista = sorted(d["afastamentos"][status], key=lambda x: (x[0], x[1], x[2]))
             partes.append(f"🔹{len(lista)} {status}")
-            partes += [f"    {i}. {t}" for i, (_, t) in enumerate(lista, 1)]
+            partes += [f"    {i}. {t}" for i, (_, _, t) in enumerate(lista, 1)]
             partes.append("")
 
         partes.append("")
