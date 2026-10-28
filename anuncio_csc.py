@@ -218,16 +218,26 @@ def formatar_nome_posto_somente_negritos(dados: Dict) -> str:
 # =========================
 # STATUS / PERÍODOS
 # =========================
+DISPENSA_CHEFIA_OPCOES = {"dispensa pela chefia", "dispensa da chefia", "dispensa chefia", "dispensa"}
+
+
 def classificar_status(resp: str) -> Tuple[str, int]:
-    rl = str(resp).strip().lower()
-    if rl == "presente":           return "Presente", 6
-    if rl == "ausente":            return "Ausente",  3
-    if rl == "folga":              return "Folga",    4
-    if "dispensa" in rl:           return "Dispensa pela Chefia", 5
+    # Remove espaços e pontuação final (ex.: "Dispensa Luto." -> "Dispensa Luto")
+    limpo = str(resp).strip().rstrip(".;:,").strip()
+    rl = limpo.lower()
+    rc = remover_acentos(rl)
+    # Opções padrão do formulário: correspondência EXATA
+    if rc == "presente":                  return "Presente", 6
+    if rc == "ausente":                   return "Ausente",  3
+    if rc == "folga":                     return "Folga",    4
+    if rc in DISPENSA_CHEFIA_OPCOES:      return "Dispensa pela Chefia", 5
+    # Texto livre (campo "Outros"): preserva o texto digitado;
+    # palavras-chave definem apenas a ordem no anúncio
+    texto = limpo[:1].upper() + limpo[1:]
     for kws, pri in STATUS_KEYWORDS:
         if any(k in rl for k in kws):
-            return str(resp).strip(), pri
-    return str(resp).strip(), 50
+            return texto, pri
+    return texto, 50
 
 
 def precisa_periodo(status: str) -> bool:
