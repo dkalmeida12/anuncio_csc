@@ -14,7 +14,7 @@ import streamlit as st
 # =========================
 # CONFIG
 # =========================
-VERSAO = "v6.0"
+VERSAO = "v6.1"
 TZ = ZoneInfo("America/Sao_Paulo")
 
 # Colunas da aba de respostas que NÃO são militares
@@ -730,6 +730,42 @@ def gerar_anuncio(data_formatada: str, categorias_dados: Dict,
 
 
 # =========================
+# UI — SITUAÇÃO DAS SEÇÕES
+# =========================
+def situacao_secoes(efetivo: Dict, respostas: Dict) -> Tuple[List[Tuple[str, int]], List[Tuple[str, List[str]]]]:
+    """(seções sem nenhuma resposta [(seção, total)], seções incompletas [(seção, [faltantes])])."""
+    por_secao: Dict[str, List[Dict]] = {}
+    for chave, dados in efetivo.items():
+        por_secao.setdefault(dados.get("secao") or "SEM SEÇÃO", []).append((chave, dados))
+    sem_resposta, incompletas = [], []
+    for secao, membros in por_secao.items():
+        faltam = [nome_completo_simples(d) for c, d in membros if c not in respostas]
+        if len(faltam) == len(membros):
+            sem_resposta.append((secao, len(membros)))
+        elif faltam:
+            incompletas.append((secao, faltam))
+    return sorted(sem_resposta), sorted(incompletas)
+
+
+def mostrar_situacao_secoes(efetivo: Dict, respostas: Dict):
+    sem_resposta, incompletas = situacao_secoes(efetivo, respostas)
+    if not sem_resposta and not incompletas:
+        st.success("✅ Todas as seções já responderam.")
+        return
+    if sem_resposta:
+        st.error(
+            f"❌ **Seções que ainda não responderam ({len(sem_resposta)}):**\n\n"
+            + "\n".join(f"- {s} ({q} servidores)" for s, q in sem_resposta)
+        )
+    if incompletas:
+        st.warning(
+            "⚠️ **Seções com servidores não informados:**\n\n"
+            + "\n".join(f"- {s}: {', '.join(f)}" for s, f in incompletas)
+        )
+    st.caption("Clique em **🔄 Atualizar dados da planilha** para ver respostas enviadas depois.")
+
+
+# =========================
 # UI — PERÍODOS
 # =========================
 def etapa_periodos(afastados: List[Tuple], df_af: pd.DataFrame, hoje: date) -> bool:
@@ -915,12 +951,14 @@ def main():
     df_hoje = df_form[df_form["_data"] == hoje].drop(columns=["_data"])
     if df_hoje.empty:
         st.warning(f"⚠️ Nenhuma resposta para {data_formatada}.")
+        mostrar_situacao_secoes(efetivo, {})
         st.stop()
     df_hoje = df_hoje.sort_values("_carimbo", ascending=False).drop(columns=["_carimbo"])
     st.success(f"✅ {len(df_hoje)} envio(s) para {data_formatada} "
                f"({df_hoje['Seção:'].nunique()} seção(ões)).")
 
     respostas, conf = processar_respostas(df_hoje, nome_index, efetivo)
+    mostrar_situacao_secoes(efetivo, respostas)
     df_af = dados["afastamentos"]
     divergencias = divergencias_afastamentos(efetivo, respostas, df_af, hoje)
 
